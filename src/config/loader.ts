@@ -16,11 +16,16 @@ const DEFAULT_CONFIG: RadarConfig = {
 
 export async function loadConfig(targetDir: string): Promise<RadarConfig> {
   const configPath = path.resolve(targetDir, ".gitleak-radar.json");
+  let raw: string;
   try {
-    const raw = await fs.readFile(configPath, "utf-8");
-    const parsed = JSON.parse(raw);
-    return ConfigSchema.parse(parsed);
-  } catch {
-    return DEFAULT_CONFIG;
+    raw = await fs.readFile(configPath, "utf-8");
+  } catch (err: any) {
+    if (err.code === "ENOENT") {
+      return DEFAULT_CONFIG;
+    }
+    throw err;
   }
+
+  const parsed = JSON.parse(raw);
+  return ConfigSchema.parse(parsed);
 }

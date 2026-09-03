@@ -16,26 +16,37 @@ export async function isInsideGitRepo(targetDir: string): Promise<boolean> {
   }
 }
 
+export async function getGitRoot(targetDir: string): Promise<string> {
+  const { stdout } = await execFileAsync("git", ["rev-parse", "--show-toplevel"], {
+    cwd: targetDir
+  });
+  return stdout.trim();
+}
+
 export async function getStagedFiles(targetDir: string): Promise<string[]> {
   const isRepo = await isInsideGitRepo(targetDir);
   if (!isRepo) {
     throw new Error("Target directory is not a Git repository or git is not installed.");
   }
 
+  const gitRoot = await getGitRoot(targetDir);
+
   // Name-only staged files excluding deleted (filter=d)
   const { stdout } = await execFileAsync("git", ["diff", "--cached", "--name-only", "--diff-filter=d"], {
-    cwd: targetDir
+    cwd: gitRoot
   });
 
   const lines = stdout.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
   const existingFiles: string[] = [];
 
-  for (const relativePath of lines) {
-    const fullPath = path.resolve(targetDir, relativePath);
+  for (const relativeToGitRoot of lines) {
+    const absoluteFilePath = path.resolve(gitRoot, relativeToGitRoot);
     try {
-      const stat = await fs.stat(fullPath);
+      const stat = await fs.stat(absoluteFilePath);
       if (stat.isFile()) {
-        existingFiles.push(relativePath.replace(/\\/g, "/"));
+        // targetDir'e göre göreceli yol (scanner'ın path.resolve(targetDir, ...) ile uyumlu olması için)
+        const relToTarget = path.relative(targetDir, absoluteFilePath);
+        existingFiles.push(relToTarget.replace(/\\/g, "/"));
       }
     } catch {
       // Dosya silinmiş veya erişilemiyorsa atla

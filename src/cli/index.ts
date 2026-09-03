@@ -81,9 +81,9 @@ program
         process.exit(1);
       }
       process.exit(0);
-    } catch (err) {
-      if (spinner) spinner.fail("Scan failed.");
-      console.error(chalk.red(`Error: ${(err as Error).message}`));
+    } catch (err: any) {
+      if (spinner) spinner.stop();
+      console.error(chalk.red(`Error: ${err.message || err}`));
       process.exit(2);
     }
   });
