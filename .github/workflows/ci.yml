@@ -8,7 +8,7 @@ on:
 
 jobs:
   audit-and-build:
-    name: Typecheck, Test & Build
+    name: Build & Test
     runs-on: ubuntu-latest
 
     steps:
@@ -32,11 +32,11 @@ jobs:
       - name: Run TypeScript typecheck
         run: pnpm typecheck
 
-      - name: Run Vitest test suite
-        run: pnpm test
-
       - name: Run production build
         run: pnpm build
+
+      - name: Run Vitest test suite
+        run: pnpm test
 
       - name: Verify package bundle
         run: pnpm pack --dry-run
