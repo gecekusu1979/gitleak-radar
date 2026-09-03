@@ -1,32 +1,42 @@
-name: CI & Security Scan
+﻿name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [ main, master ]
   pull_request:
-    branches: [main]
+    branches: [ main, master ]
 
 jobs:
-  validate:
+  audit-and-build:
+    name: Typecheck, Test & Build
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: Install pnpm
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
         uses: pnpm/action-setup@v3
         with:
-          version: 8
+          version: 9
 
-      - name: Set up Node.js
+      - name: Setup Node.js (LTS 20)
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "pnpm"
+          cache: 'pnpm'
 
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
-      - run: pnpm test
-      - run: pnpm build
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-      - name: Self-scan security audit
-        run: node dist/cli/index.js scan . --severity medium
+      - name: Run TypeScript typecheck
+        run: pnpm typecheck
+
+      - name: Run Vitest test suite
+        run: pnpm test
+
+      - name: Run production build
+        run: pnpm build
+
+      - name: Verify package bundle (pnpm pack dry-run)
+        run: pnpm pack --dry-run

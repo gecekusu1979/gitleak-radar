@@ -36,6 +36,7 @@ export interface ScanOptions {
   json?: boolean;
   ignore?: string[];
   verbose?: boolean;
+  staged?: boolean;
   onFileAction?: (filePath: string, status: "scanned" | "ignored" | "binary") => void;
 }
 

@@ -7,51 +7,65 @@ import { EXCLUDED_DIRECTORIES, shouldIgnoreFile } from "./file-filter.js";
 import { readFileLines } from "./file-reader.js";
 import { calculateSecurityScore } from "../scoring/scorer.js";
 import { loadConfig } from "../config/loader.js";
+import { getStagedFiles, isInsideGitRepo } from "../git/staged.js";
 
 export class ProjectScanner {
   public async scan(options: ScanOptions): Promise<ScanResult> {
     const startTime = performance.now();
     const targetDir = path.resolve(process.cwd(), options.path);
-    const config = await loadConfig(targetDir);
 
-    const activeRules = DETECTION_RULES.filter(
-      (rule) => config.rules[rule.id] !== false
-    );
+    if (options.staged) {
+      const isRepo = await isInsideGitRepo(targetDir);
+      if (!isRepo) {
+        throw new Error("Cannot run --staged scan: Specified path is not inside a Git repository.");
+      }
+    }
+
+    const config = await loadConfig(targetDir);
+    const activeRules = DETECTION_RULES.filter((rule) => config.rules[rule.id] !== false);
     const detector = new SecretDetector(activeRules);
 
-    const mergedIgnores = [
-      ...EXCLUDED_DIRECTORIES,
-      ...(options.ignore ?? []).map((i: string) => `**/${i}/**`),
-      ...config.ignore.map((i: string) => `**/${i}/**`)
-    ];
+    let candidateFiles: string[] = [];
 
-    const files = await fg(["**/*"], {
-      cwd: targetDir,
-      dot: true,
-      ignore: mergedIgnores,
-      onlyFiles: true,
-      followSymbolicLinks: false
-    });
+    if (options.staged) {
+      candidateFiles = await getStagedFiles(targetDir);
+    } else {
+      const mergedIgnores = [
+        ...EXCLUDED_DIRECTORIES,
+        ...(options.ignore ?? []).map((i: string) => `**/${i}/**`),
+        ...config.ignore.map((i: string) => `**/${i}/**`)
+      ];
+
+      candidateFiles = await fg(["**/*"], {
+        cwd: targetDir,
+        dot: true,
+        ignore: mergedIgnores,
+        onlyFiles: true,
+        followSymbolicLinks: false
+      });
+    }
 
     let totalScannedFiles = 0;
     let totalScannedLines = 0;
     const findings: Finding[] = [];
 
-    for (const relativePath of files) {
-      if (shouldIgnoreFile(relativePath)) {
-        options.onFileAction?.(relativePath, "ignored");
+    for (const rawPath of candidateFiles) {
+      const normalizedPath = rawPath.replace(/\\/g, "/");
+
+      if (shouldIgnoreFile(normalizedPath)) {
+        options.onFileAction?.(normalizedPath, "ignored");
         continue;
       }
 
-      const absolutePath = path.join(targetDir, relativePath);
+      const absolutePath = path.resolve(targetDir, normalizedPath);
       const fileData = await readFileLines(absolutePath);
 
       if (!fileData) {
-        options.onFileAction?.(relativePath, "binary");
+        options.onFileAction?.(normalizedPath, "binary");
         continue;
       }
 
-      options.onFileAction?.(relativePath, "scanned");
+      options.onFileAction?.(normalizedPath, "scanned");
       totalScannedFiles++;
       totalScannedLines += fileData.totalLines;
 
@@ -60,7 +74,7 @@ export class ProjectScanner {
         const lineFindings = detector.scanLine(
           lineContent,
           i + 1,
-          relativePath,
+          normalizedPath,
           options.severity ?? "low"
         );
         findings.push(...lineFindings);

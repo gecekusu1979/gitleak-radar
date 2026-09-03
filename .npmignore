@@ -1,0 +1,11 @@
+﻿.github/
+tests/
+.git/
+.gitignore
+tsconfig.json
+vitest.config.ts
+pnpm-lock.yaml
+pnpm-workspace.yaml
+*.log
+.env*
+fixtures/
