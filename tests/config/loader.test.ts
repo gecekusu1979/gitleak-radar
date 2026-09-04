@@ -1,31 +1,53 @@
-﻿import { describe, it, expect } from "vitest";
-import { ConfigSchema, loadConfig } from "../../src/config/loader.js";
+﻿import { describe, it, expect, vi, beforeEach } from "vitest";
+import { loadConfig } from "../../src/config/loader.js";
+import fs from "node:fs/promises";
 
-describe("Configuration Engine", () => {
-  it("validates a compliant .gitleak-radar.json schema", () => {
-    const raw = {
-      ignore: ["fixtures/**", "custom-dir/**"],
-      rules: { "jwt": false, "generic-password": true }
-    };
-    const parsed = ConfigSchema.parse(raw);
-    expect(parsed.ignore).toHaveLength(2);
-    expect(parsed.rules["jwt"]).toBe(false);
+vi.mock("node:fs/promises");
+
+describe("Config Loader", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  it("falls back to defaults on empty object", () => {
-    const parsed = ConfigSchema.parse({});
-    expect(parsed.ignore).toEqual([]);
-    expect(parsed.rules).toEqual({});
-  });
-
-  it("gracefully returns default config when file is non-existent", async () => {
-    const config = await loadConfig("/non/existent/path/99999");
+  it("returns default config when .gitleak-radar.json does not exist", async () => {
+    vi.mocked(fs.readFile).mockRejectedValueOnce({ code: "ENOENT" });
+    const config = await loadConfig(".");
     expect(config.ignore).toEqual([]);
     expect(config.rules).toEqual({});
   });
 
-  it("rejects invalid schema structure", () => {
-    const invalid = { ignore: "not-an-array" };
-    expect(() => ConfigSchema.parse(invalid)).toThrow();
+  it("loads valid configuration successfully", async () => {
+    const validJson = JSON.stringify({
+      ignore: ["src/test/**"],
+      rules: { "aws-access-key": false }
+    });
+    vi.mocked(fs.readFile).mockResolvedValueOnce(validJson);
+    const config = await loadConfig(".");
+    expect(config.ignore).toEqual(["src/test/**"]);
+    expect(config.rules["aws-access-key"]).toBe(false);
+  });
+
+  it("throws descriptive Error when an invalid rule ID is provided", async () => {
+    const invalidJson = JSON.stringify({
+      rules: { "aws-acces-key": false }
+    });
+    vi.mocked(fs.readFile).mockResolvedValueOnce(invalidJson);
+    await expect(loadConfig(".")).rejects.toThrow(/Invalid \.gitleak-radar\.json/);
+  });
+
+  it("throws Error on unclosed bracket in glob pattern", async () => {
+    const unclosedBracket = JSON.stringify({
+      ignore: ["[unclosed/"]
+    });
+    vi.mocked(fs.readFile).mockResolvedValueOnce(unclosedBracket);
+    await expect(loadConfig(".")).rejects.toThrow(/Invalid glob pattern/);
+  });
+
+  it("throws Error on unmatched closing brace in glob pattern", async () => {
+    const unmatchedClosing = JSON.stringify({
+      ignore: ["foo}"]
+    });
+    vi.mocked(fs.readFile).mockResolvedValueOnce(unmatchedClosing);
+    await expect(loadConfig(".")).rejects.toThrow(/Invalid glob pattern/);
   });
 });

@@ -1,23 +1,33 @@
-﻿import { describe, it, expect, vi } from 'vitest';
-import fs from 'node:fs';
-import { readTextFileSafe, MAX_FILE_SIZE_BYTES } from '../../src/scanner/file-reader.js';
+﻿import { describe, it, expect, vi, beforeEach } from "vitest";
+import { readFileLines, MAX_FILE_SIZE_BYTES } from "../../src/scanner/file-reader.js";
+import fs from "node:fs/promises";
 
-describe('Large File Protection', () => {
-  it('skips reading files exceeding MAX_FILE_SIZE_BYTES', () => {
-    vi.spyOn(fs, 'statSync').mockReturnValue({ size: MAX_FILE_SIZE_BYTES + 1024 } as any);
-    const result = readTextFileSafe('huge_file.log');
-    expect(result.skipped).toBe(true);
-    expect(result.content).toBeNull();
-    expect(result.reason).toContain('exceeds maximum size');
-    vi.restoreAllMocks();
+vi.mock("node:fs/promises");
+
+describe("readFileLines - File Size Protection", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  it('reads normal files within limit', () => {
-    vi.spyOn(fs, 'statSync').mockReturnValue({ size: 1024 } as any);
-    vi.spyOn(fs, 'readFileSync').mockReturnValue('clean code content');
-    const result = readTextFileSafe('normal_file.ts');
-    expect(result.skipped).toBe(false);
-    expect(result.content).toBe('clean code content');
-    vi.restoreAllMocks();
+  it("returns null when file size exceeds MAX_FILE_SIZE_BYTES (10MB)", async () => {
+    vi.mocked(fs.stat).mockResolvedValueOnce({
+      size: MAX_FILE_SIZE_BYTES + 1
+    } as any);
+
+    const result = await readFileLines("large-file.dat");
+    expect(result).toBeNull();
+  });
+
+  it("reads lines normally when file size is within limits", async () => {
+    vi.mocked(fs.stat).mockResolvedValueOnce({
+      size: 100
+    } as any);
+
+    vi.mocked(fs.readFile).mockResolvedValueOnce(Buffer.from("line1\nline2"));
+
+    const result = await readFileLines("normal.ts");
+    expect(result).not.toBeNull();
+    expect(result?.lines).toEqual(["line1", "line2"]);
+    expect(result?.totalLines).toBe(2);
   });
 });

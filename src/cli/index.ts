@@ -107,8 +107,15 @@ program
   .command("install-hook")
   .description("Install GitLeak Radar as a Git pre-commit hook")
   .argument("[path]", "Target git repository path", ".")
-  .action(async (targetDir: string) => {
-    const res = await installPreCommitHook(targetDir);
+  .option("-s, --severity <level>", "Minimum severity for hook scan (low, medium, high, critical)", "low")
+  .action(async (targetDir: string, options: { severity: string }) => {
+    const validSeverities: Severity[] = ["low", "medium", "high", "critical"];
+    if (!validSeverities.includes(options.severity as Severity)) {
+      console.error(chalk.red(`Error: Invalid severity "${options.severity}". Valid options are: ${validSeverities.join(", ")}`));
+      process.exit(2);
+    }
+
+    const res = await installPreCommitHook(targetDir, options.severity);
     if (res.success) {
       console.log(chalk.green(`✓ ${res.message}`));
       process.exit(0);

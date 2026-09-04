@@ -1,4 +1,4 @@
-import { Finding, ScoreReport, ScoreTier, Severity } from "../types/index.js";
+﻿import { Finding, ScoreReport, ScoreTier, Severity } from "../types/index.js";
 
 const PENALTIES: Record<Severity, number> = {
   critical: 35,
@@ -16,10 +16,16 @@ export function calculateSecurityScore(findings: Finding[]): ScoreReport {
   };
 
   let totalPenalty = 0;
+  const uniquePenaltyKeys = new Set<string>();
 
   for (const finding of findings) {
     counts[finding.severity]++;
-    totalPenalty += PENALTIES[finding.severity];
+
+    const key = `${finding.ruleId}::${finding.file}`;
+    if (!uniquePenaltyKeys.has(key)) {
+      uniquePenaltyKeys.add(key);
+      totalPenalty += PENALTIES[finding.severity];
+    }
   }
 
   const score = Math.max(0, 100 - totalPenalty);

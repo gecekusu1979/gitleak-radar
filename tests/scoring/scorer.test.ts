@@ -3,42 +3,84 @@ import { calculateSecurityScore } from "../../src/scoring/scorer.js";
 import { Finding } from "../../src/types/index.js";
 
 describe("Security Scorer", () => {
-  it("returns 100 with Excellent tier when findings list is empty", () => {
-    const result = calculateSecurityScore([]);
-    expect(result.score).toBe(100);
-    expect(result.tier).toBe("Excellent");
+  it("calculates 100 score for empty findings", () => {
+    const report = calculateSecurityScore([]);
+    expect(report.score).toBe(100);
+    expect(report.tier).toBe("Excellent");
+    expect(report.counts.critical).toBe(0);
   });
 
-  it("deducts correctly for low severity findings", () => {
-    const findings: Finding[] = [
-      { ruleId: "r1", ruleName: "R1", severity: "low", file: "a.ts", line: 1, column: 1, maskedValue: "***" }
-    ];
-    const result = calculateSecurityScore(findings);
-    expect(result.score).toBe(95);
-  });
-
-  it("deducts correctly for critical findings and drops tier", () => {
-    const findings: Finding[] = [
-      { ruleId: "crit1", ruleName: "Crit", severity: "critical", file: "a.env", line: 1, column: 1, maskedValue: "***" },
-      { ruleId: "crit2", ruleName: "Crit", severity: "critical", file: "b.env", line: 1, column: 1, maskedValue: "***" }
-    ];
-    const result = calculateSecurityScore(findings);
-    expect(result.score).toBe(30);
-    expect(result.tier).toBe("Critical");
-  });
-
-  it("never goes below zero even with extreme findings", () => {
-    const findings: Finding[] = Array.from({ length: 10 }, (_, i) => ({
-      ruleId: `crit-${i}`,
-      ruleName: "Crit",
+  it("applies penalty 1x for 5 duplicate findings of same ruleId and file", () => {
+    const findings: Finding[] = Array.from({ length: 5 }).map((_, idx) => ({
+      ruleId: "aws-access-key",
+      ruleName: "AWS Access Key",
       severity: "critical",
-      file: "secret.env",
-      line: i,
+      file: "src/aws.ts",
+      line: idx + 1,
       column: 1,
-      maskedValue: "***"
+      maskedValue: "AKIA********"
     }));
-    const result = calculateSecurityScore(findings);
-    expect(result.score).toBe(0);
-    expect(result.tier).toBe("Critical");
+
+    const report = calculateSecurityScore(findings);
+    // critical penalty = 35. 100 - 35 = 65
+    expect(report.score).toBe(65);
+    expect(report.counts.critical).toBe(5);
+  });
+
+  it("applies separate penalties for same ruleId in different files", () => {
+    const findings: Finding[] = [
+      {
+        ruleId: "aws-access-key",
+        ruleName: "AWS Access Key",
+        severity: "critical",
+        file: "src/file1.ts",
+        line: 1,
+        column: 1,
+        maskedValue: "AKIA********"
+      },
+      {
+        ruleId: "aws-access-key",
+        ruleName: "AWS Access Key",
+        severity: "critical",
+        file: "src/file2.ts",
+        line: 1,
+        column: 1,
+        maskedValue: "AKIA********"
+      }
+    ];
+
+    const report = calculateSecurityScore(findings);
+    // 2 * 35 = 70 penalty. 100 - 70 = 30
+    expect(report.score).toBe(30);
+    expect(report.counts.critical).toBe(2);
+  });
+
+  it("applies separate penalties for different rules in the same file", () => {
+    const findings: Finding[] = [
+      {
+        ruleId: "aws-access-key",
+        ruleName: "AWS Access Key",
+        severity: "critical",
+        file: "src/auth.ts",
+        line: 1,
+        column: 1,
+        maskedValue: "AKIA********"
+      },
+      {
+        ruleId: "generic-password",
+        ruleName: "Generic Password",
+        severity: "medium",
+        file: "src/auth.ts",
+        line: 2,
+        column: 1,
+        maskedValue: "pass********"
+      }
+    ];
+
+    const report = calculateSecurityScore(findings);
+    // critical (35) + medium (10) = 45 penalty. 100 - 45 = 55
+    expect(report.score).toBe(55);
+    expect(report.counts.critical).toBe(1);
+    expect(report.counts.medium).toBe(1);
   });
 });

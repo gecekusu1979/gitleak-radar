@@ -22,14 +22,14 @@ export const DETECTION_RULES: DetectionRule[] = [
     name: "GitHub Personal Access Token",
     description: "Identifies classic and fine-grained GitHub access tokens",
     severity: "critical",
-    pattern: /\b(ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{82})\b/g,
-    keywords: ["ghp_", "github_pat_"]
+    pattern: /\b(gh[opusr]_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{82})\b/g,
+    keywords: ["ghp_", "gho_", "ghu_", "ghs_", "ghr_", "github_pat_"]
   },
   {
     id: "jwt",
     name: "JSON Web Token (JWT)",
     description: "Identifies hardcoded base64-encoded JWT signatures",
-    severity: "medium",
+    severity: "high",
     pattern: /\b(ey[A-Za-z0-9-_=]+\.ey[A-Za-z0-9-_=]+\.[A-Za-z0-9-_.+/=]+)\b/g,
     keywords: ["ey"]
   },
@@ -70,15 +70,15 @@ export const DETECTION_RULES: DetectionRule[] = [
     name: "Generic API Key",
     description: "Identifies assignments of high-entropy strings to api_key variables",
     severity: "medium",
-    pattern: /(?:api_key|apikey|secret|api_token)\s*[:=]\s*["']([A-Za-z0-9\-_]{20,64})["']/gi,
-    keywords: ["api_key", "apikey", "secret"]
+    pattern: /(?:api_key|apikey|secret|api_token)\s*[:=]\s*["']?([A-Za-z0-9\-_]{20,64})["']?/gi,
+    keywords: ["api_key", "apikey", "secret", "api_token"]
   },
   {
     id: "generic-bearer-token",
     name: "Generic Bearer Token",
     description: "Identifies hardcoded Bearer authorization tokens",
     severity: "high",
-    pattern: /(?:bearer)\s+([A-Za-z0-9\-._~+/]+=*)/gi,
+    pattern: /(?:bearer)\s+([A-Za-z0-9\-._~+/]{20,}=*)/gi,
     keywords: ["bearer"]
   },
   {
@@ -86,7 +86,7 @@ export const DETECTION_RULES: DetectionRule[] = [
     name: "Generic Password Assignment",
     description: "Identifies static password variable definitions",
     severity: "medium",
-    pattern: /(?:password|passwd|pwd)\s*[:=]\s*["']([^"'\s]{8,64})["']/gi,
+    pattern: /(?:password|passwd|pwd)\s*[:=]\s*["']?([^"'\s#]{8,64})["']?/gi,
     keywords: ["password", "passwd", "pwd"]
   }
 ];

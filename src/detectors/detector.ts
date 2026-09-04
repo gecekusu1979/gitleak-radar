@@ -13,7 +13,7 @@ export class SecretDetector {
     if (trimmed.length <= 8) {
       return "********";
     }
-    const visibleLength = Math.min(4, Math.floor(trimmed.length / 4));
+    const visibleLength = Math.min(2, Math.floor(trimmed.length / 6));
     const prefix = trimmed.slice(0, visibleLength);
     const suffix = trimmed.slice(-visibleLength);
     return `${prefix}********${suffix}`;

@@ -7,9 +7,7 @@ export const EXCLUDED_DIRECTORIES = [
   "**/build/**",
   "**/.next/**",
   "**/coverage/**",
-  "**/vendor/**",
-  "**/tests/**",
-  "**/test/**"
+  "**/vendor/**"
 ];
 
 export const EXCLUDED_EXTENSIONS = new Set([
@@ -41,15 +39,26 @@ const PLACEHOLDERS = [
   "todo"
 ];
 
+const OBVIOUS_PLACEHOLDER_SUBSTRINGS = [
+  "your_api_key",
+  "change_me",
+  "xxxx",
+  "********",
+  "my_secret",
+  "placeholder"
+];
+
 export function shouldIgnoreFile(filePath: string): boolean {
+  const normalizedPath = filePath.replace(/\\/g, "/");
   const ext = path.extname(filePath).toLowerCase();
   const basename = path.basename(filePath);
 
+  // Only ignore gitleak-radar's internal detector rule and engine definitions
   if (
-    basename === "rules.ts" ||
-    basename === "rules.js" ||
-    basename === "detector.ts" ||
-    basename === "detector.js"
+    normalizedPath === "src/detectors/rules.ts" ||
+    normalizedPath.endsWith("/src/detectors/rules.ts") ||
+    normalizedPath === "src/detectors/detector.ts" ||
+    normalizedPath.endsWith("/src/detectors/detector.ts")
   ) {
     return true;
   }
@@ -64,24 +73,32 @@ export function shouldIgnoreFile(filePath: string): boolean {
 export function isPlaceholderOrExample(
   extractedValue: string,
   lineContext: string,
-  filePath: string
+  filePath?: string
 ): boolean {
   const normalizedValue = extractedValue.toLowerCase();
   const normalizedLine = lineContext.toLowerCase();
-  const normalizedPath = filePath.toLowerCase();
+  const normalizedPath = filePath ? filePath.toLowerCase().replace(/\\/g, "/") : "";
 
-  if (
+  const isTestOrDoc =
     normalizedPath.includes("test") ||
+    normalizedPath.includes("fixture") ||
+    normalizedPath.includes("mock") ||
+    normalizedPath.includes("example") ||
     normalizedPath.endsWith(".md") ||
-    normalizedPath.endsWith(".mdx")
-  ) {
+    normalizedPath.endsWith(".mdx");
+
+  if (isTestOrDoc) {
     if (PLACEHOLDERS.some((p) => normalizedValue.includes(p))) {
       return true;
     }
-  }
-
-  if (PLACEHOLDERS.some((p) => normalizedValue === p || normalizedValue.includes(p))) {
-    return true;
+  } else {
+    // Normal production source files: strict equality for common words, substring only for unambiguous markers
+    if (PLACEHOLDERS.some((p) => normalizedValue === p)) {
+      return true;
+    }
+    if (OBVIOUS_PLACEHOLDER_SUBSTRINGS.some((p) => normalizedValue.includes(p))) {
+      return true;
+    }
   }
 
   const uniqueChars = new Set(extractedValue.split(""));

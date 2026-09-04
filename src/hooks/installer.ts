@@ -1,7 +1,10 @@
 ﻿import fs from "node:fs/promises";
 import path from "node:path";
 
-export async function installPreCommitHook(targetDir: string = "."): Promise<{ success: boolean; message: string }> {
+export async function installPreCommitHook(
+  targetDir: string = ".",
+  severity: string = "low"
+): Promise<{ success: boolean; message: string }> {
   const gitDir = path.resolve(targetDir, ".git");
   const hooksDir = path.join(gitDir, "hooks");
   const hookFile = path.join(hooksDir, "pre-commit");
@@ -28,7 +31,7 @@ else
 fi
 
 echo "🕵️  GitLeak Radar: Scanning staged files..."
-$SCANNER_CMD scan --staged
+$SCANNER_CMD scan --staged --severity ${severity}
 SCAN_EXIT=$?
 
 if [ $SCAN_EXIT -eq 1 ]; then
@@ -59,6 +62,17 @@ fi
 
     const updatedContent = `${existingContent.trimEnd()}\n${hookScriptBody.trim()}\n`;
     await fs.writeFile(hookFile, updatedContent, { mode: 0o755 });
+    await fs.chmod(hookFile, 0o755);
+
+    // Verify executable permissions on POSIX environments
+    if (process.platform !== "win32") {
+      const fileStat = await fs.stat(hookFile);
+      const isExecutable = (fileStat.mode & 0o111) !== 0;
+      if (!isExecutable) {
+        return { success: false, message: "Failed to set executable permissions on hook file." };
+      }
+    }
+
     return { success: true, message: "Pre-commit hook successfully installed at .git/hooks/pre-commit" };
   } catch (err) {
     return { success: false, message: (err as Error).message };
