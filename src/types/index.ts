@@ -15,7 +15,9 @@ export const DetectionRuleSchema = z.object({
   description: z.string(),
   severity: z.enum(["low", "medium", "high", "critical"]),
   pattern: z.instanceof(RegExp),
-  keywords: z.array(z.string()).optional()
+  keywords: z.array(z.string()).optional(),
+  minEntropy: z.number().optional(),
+  requiresEntropy: z.boolean().optional()
 });
 
 export type DetectionRule = z.infer<typeof DetectionRuleSchema>;
@@ -28,6 +30,9 @@ export interface Finding {
   line: number;
   column: number;
   maskedValue: string;
+  commit?: string;
+  commitAuthor?: string;
+  commitDate?: string;
 }
 
 export interface ScanOptions {
@@ -37,6 +42,8 @@ export interface ScanOptions {
   ignore?: string[];
   verbose?: boolean;
   staged?: boolean;
+  history?: boolean;
+  maxCommits?: number;
   onFileAction?: (filePath: string, status: "scanned" | "ignored" | "binary") => void;
 }
 
@@ -56,6 +63,7 @@ export interface ScanResult {
     score: number;
     tier: ScoreTier;
     durationMs: number;
+    commitsScanned?: number;
   };
   findings: Finding[];
 }

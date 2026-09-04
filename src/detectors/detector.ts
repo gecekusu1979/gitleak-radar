@@ -1,6 +1,8 @@
-﻿export const MAX_LINE_LENGTH = 8192;
-import { DetectionRule, Finding, Severity, SeverityOrder } from "../types/index.js";
+﻿import { type DetectionRule, type Finding, type Severity, SeverityOrder } from "../types/index.js";
 import { isPlaceholderOrExample } from "../scanner/file-filter.js";
+import { calculateShannonEntropy, isHighEntropyToken } from "./entropy.js";
+
+export const MAX_LINE_LENGTH = 8192;
 
 export class SecretDetector {
   private rules: DetectionRule[];
@@ -9,15 +11,13 @@ export class SecretDetector {
     this.rules = rules;
   }
 
-  public mask(value: string): string {
-    const trimmed = value.trim();
-    if (trimmed.length <= 8) {
-      return "********";
+  public mask(secret: string): string {
+    if (secret.length <= 4) {
+      return "*".repeat(secret.length);
     }
-    const visibleLength = Math.min(2, Math.floor(trimmed.length / 6));
-    const prefix = trimmed.slice(0, visibleLength);
-    const suffix = trimmed.slice(-visibleLength);
-    return `${prefix}********${suffix}`;
+    const prefix = secret.slice(0, 2);
+    const suffix = secret.slice(-2);
+    return `${prefix}${"*".repeat(secret.length - 4)}${suffix}`;
   }
 
   public scanLine(
@@ -27,20 +27,18 @@ export class SecretDetector {
     minSeverity: Severity = "low"
   ): Finding[] {
     const findings: Finding[] = [];
-    // ReDoS Koruması: Aşırı uzun minified satırlarda regex kilitlenmesini önle
     const targetLine = line.length > MAX_LINE_LENGTH ? line.slice(0, MAX_LINE_LENGTH) : line;
-    const minRank = SeverityOrder[minSeverity];
     const lowerLine = targetLine.toLowerCase();
+    const minSeverityWeight = SeverityOrder[minSeverity];
 
     for (const rule of this.rules) {
-      if (SeverityOrder[rule.severity] < minRank) {
+      if (SeverityOrder[rule.severity] < minSeverityWeight) {
         continue;
       }
 
-      // Keyword pre-filtering: Kuralda keyword tanımlıysa ve satırda hiçbiri yoksa regex'i atla
       if (rule.keywords && rule.keywords.length > 0) {
-        const hasKeyword = rule.keywords.some((k) => lowerLine.includes(k.toLowerCase()));
-        if (!hasKeyword) {
+        const matchesKeyword = rule.keywords.some((kw) => lowerLine.includes(kw.toLowerCase()));
+        if (!matchesKeyword) {
           continue;
         }
       }
@@ -49,12 +47,23 @@ export class SecretDetector {
       let match: RegExpExecArray | null;
 
       while ((match = rule.pattern.exec(targetLine)) !== null) {
-        const rawSecret = match[1] ?? match[0];
-        const index = match.index;
+        const rawSecret = match[1] || match[0];
 
         if (isPlaceholderOrExample(rawSecret, targetLine, filePath)) {
           continue;
         }
+
+        if (rule.requiresEntropy || typeof rule.minEntropy === "number") {
+          const tokenEntropy = calculateShannonEntropy(rawSecret);
+          const minThreshold = typeof rule.minEntropy === "number" ? rule.minEntropy : 3.0;
+          if (tokenEntropy < minThreshold) {
+            continue;
+          }
+        }
+
+        const matchIndex = match.index;
+        const secretSubIndex = match[0].indexOf(rawSecret);
+        const column = matchIndex + (secretSubIndex !== -1 ? secretSubIndex : 0) + 1;
 
         findings.push({
           ruleId: rule.id,
@@ -62,13 +71,16 @@ export class SecretDetector {
           severity: rule.severity,
           file: filePath,
           line: lineNumber,
-          column: index + 1,
+          column,
           maskedValue: this.mask(rawSecret)
         });
+
+        if (!rule.pattern.global) {
+          break;
+        }
       }
     }
 
     return findings;
   }
 }
-

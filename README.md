@@ -1,6 +1,8 @@
 # GitLeak Radar 🛡️
 
 [![CI](https://github.com/gecekusu1979/gitleak-radar/actions/workflows/ci.yml/badge.svg)](https://github.com/gecekusu1979/gitleak-radar/actions)
+[![Tests](https://img.shields.io/badge/tests-70%2F70%20passing-brightgreen.svg)]()
+[![SARIF](https://img.shields.io/badge/SARIF-v2.1.0%20Compliant-blue.svg)]()
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict%20Mode-3178c6.svg)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18.0.0-339933.svg)](https://nodejs.org/)
@@ -8,12 +10,18 @@
 
 > **Static credential scanner and automated Git pre-commit hook designed to detect exposed API keys, access tokens, private keys, and database connection strings before code is committed or pushed.**
 
-GitLeak Radar runs locally across your codebase or directly against the staged Git index. It uses regex-based pattern matching with keyword pre-filtering, scans test and fixture directories by default, accurately identifies unquoted `.env` secrets, filters out dummy placeholders without dropping real test credentials, masks matched secrets in memory, computes a 0–100 repository security score, and enforces fail-closed workflow gates using standard UNIX exit codes.
+GitLeak Radar runs locally across your codebase, directly against the staged Git index, or across Git commit history. It combines regex-based pattern matching, keyword pre-filtering, Shannon entropy checks for generic API keys, OASIS SARIF v2.1.0 reporting, and fail-closed workflow gates while preserving masked findings and a 0–100 repository security score.
+
+GitLeak Radar is designed as a local-first SAST tool for detecting API keys, access tokens, private keys, database credentials, and other sensitive values before they enter commits or CI/CD workflows.
 
 ---
 
 ## Key Features
 
+- **Shannon Entropy Engine:** Generic API key candidates are validated with Shannon entropy and a default threshold of $H(X) \ge 3.0$ to reduce low-complexity false positives.
+- **Streaming Git History Scanning:** `--history` processes added diff lines incrementally instead of loading the complete commit history into memory, while retaining commit hash, author, and date metadata for findings.
+- **History Diff Hardening:** History scans force `diff.external=` and `--no-ext-diff`, and terminate Git path arguments with `--` to reduce external diff and argument-injection risks.
+- **SARIF v2.1.0 Reporting:** `--sarif [file]` emits OASIS SARIF 2.1.0 output for GitHub Code Scanning and other compatible CI tooling.
 - **True Git Index Isolation:** In `--staged` mode, files are evaluated directly from Git's object database (`git show :<path>`). Modifying or clearing a secret from the working directory after staging cannot bypass detection.
 - **Fail-Closed Pre-Commit Security:** Hook scripts enforce a fail-closed posture (`exit 2`). If `gitleak-radar` or `npx` cannot be executed, commits are blocked rather than silently skipped.
 - **Monorepo & Nested Config Traversal:** `.gitleak-radar.json` configurations are resolved through upward filesystem traversal from the target path.
@@ -31,6 +39,28 @@ GitLeak Radar runs locally across your codebase or directly against the staged G
 - **Strict Config Validation:** `.gitleak-radar.json` configurations are verified with Zod for known rule IDs and checked against malformed glob syntax.
 - **Deterministic Exit Codes:** Strict exit code conventions (`0`, `1`, `2`) for robust pipeline and shell automation.
 
+## Advanced Security Features
+
+### Shannon Entropy Engine
+
+For entropy-aware rules, GitLeak Radar calculates the character distribution of each candidate token:
+
+$$H(X) = -\sum_{i=1}^{n} P(x_i) \log_2 P(x_i)$$
+
+Candidates below the configured threshold are discarded as low-complexity values. The built-in `generic-api-key` rule uses a minimum entropy threshold of $H(X) \ge 3.0$.
+
+### Streaming Git History
+
+`gitleak-radar scan --history` reads Git diff output incrementally, scanning added lines while retaining commit hash, author, and ISO date metadata. History scans disable external diff commands with `-c diff.external=` and `--no-ext-diff`, and use `--` to isolate Git path arguments.
+
+### SARIF Integration
+
+`gitleak-radar scan --sarif report.sarif` writes SARIF v2.1.0 output with rule metadata, source locations, severity levels, masked messages, and commit fingerprints where available. Omitting the file path writes the report to standard output for CI pipelines.
+
+## Performance
+
+The scanner is optimized for local and CI use through keyword pre-filtering, bounded 8 KB line processing, file-size guards, and streaming history parsing. Run `pnpm test` to measure the current test-suite duration in your environment.
+
 ## Architecture
 
 The following diagram illustrates the execution path from CLI entry to exit code assignment:
@@ -40,27 +70,32 @@ flowchart TD
     A[CLI Invocation / Pre-commit Hook] --> B{Scan Mode}
     B -->|Filesystem Path| C[FastGlob Traversal]
     B -->|--staged Flag| D[Git Index Diff: --cached --diff-filter=d]
-    C --> E[Path Exclusion & Ignore Filters]
-    D --> E
-    E --> F{Symlink Check}
-    F -->|Symlink / Path Traversal| G[Skip File Safely]
-    F -->|Regular File / Blob| H{File Size <= 10MB?}
-    H -->|Exceeds Limit| G
-    H -->|Within Limit| I[Read Staged Blob / FS Buffer]
-    I --> J{Binary Check: Null Byte?}
-    J -->|Yes| K[Skip Binary File]
-    J -->|No| L[Line Chunking: Max 8KB Window]
-    L --> M{Keyword Pre-filter Match?}
-    M -->|No| N[Skip Regex Evaluation]
-    M -->|Yes| O[Detector Engine: Regex Rules]
-    O --> P[Path-Aware Placeholder Filter]
-    P --> Q[Deterministic Masking: Max 2 Boundary Chars]
-    Q --> R[Finding Model Assembly]
-    R --> S[Security Scorer: File-Deduplicated 0 to 100]
-    S --> T{Findings Count > 0?}
-    T -->|Yes| U[Terminal / JSON Reporter] --> V[Exit Code 1: Findings Block]
-    T -->|No| W[Clean Summary Reporter] --> X[Exit Code 0: Pass]
-    Y[Invalid CLI Args / Malformed Config / Missing Hook Tool] --> Z[Standard Error Log] --> AA[Exit Code 2: Fail-Closed Error]
+    B -->|--history Flag| E[Streaming Git History Diff]
+    C --> F[Path Exclusion & Ignore Filters]
+    D --> F
+    E --> F
+    F --> G{Symlink Check}
+    G -->|Symlink / Path Traversal| H[Skip File Safely]
+    G -->|Regular File / Blob| I{File Size <= 10MB?}
+    I -->|Exceeds Limit| H
+    I -->|Within Limit| J[Read Staged Blob / FS Buffer]
+    J --> K{Binary Check: Null Byte?}
+    K -->|Yes| L[Skip Binary File]
+    K -->|No| M[Line Chunking: Max 8KB Window]
+    M --> N{Keyword Pre-filter Match?}
+    N -->|No| O[Skip Regex Evaluation]
+    N -->|Yes| P[Detector Engine: Regex Rules]
+    P --> Q{Entropy Rule?}
+    Q -->|Yes| R[Shannon Entropy Check: H(X) >= 3.0]
+    Q -->|No| S[Path-Aware Placeholder Filter]
+    R --> S
+    S --> T[Deterministic Masking: Max 2 Boundary Chars]
+    T --> U[Finding Model Assembly]
+    U --> V[Security Scorer: File-Deduplicated 0 to 100]
+    V --> W{Findings Count > 0?}
+    W -->|Yes| X[Terminal / JSON / SARIF Reporter] --> Y[Exit Code 1: Findings Block]
+    W -->|No| Z[Clean Summary Reporter] --> AA[Exit Code 0: Pass]
+    AB[Invalid CLI Args / Malformed Config / Missing Hook Tool] --> AC[Standard Error Log] --> AD[Exit Code 2: Fail-Closed Error]
 ```
 
 ## Quick Start
@@ -93,6 +128,18 @@ Scan only files currently in the Git staging area:
 
 ```bash
 gitleak-radar scan --staged
+```
+
+Scan added lines across the full Git commit history:
+
+```bash
+gitleak-radar scan --history
+```
+
+Generate a SARIF v2.1.0 report for CI or GitHub Code Scanning:
+
+```bash
+gitleak-radar scan --sarif report.sarif
 ```
 
 ## Pre-commit Hook Integration
@@ -157,6 +204,12 @@ gitleak-radar scan . --verbose
 # Ignore specific directories during a filesystem scan
 gitleak-radar scan . --ignore "fixtures" "temp-data"
 
+# Scan full Git history using a streaming diff parser
+gitleak-radar scan . --history
+
+# Write SARIF v2.1.0 output to a file (omit the path to print to stdout)
+gitleak-radar scan . --sarif report.sarif
+
 # Inspect detailed command help
 gitleak-radar scan --help
 ```
@@ -170,12 +223,17 @@ All rules are defined in `src/detectors/rules.ts` and can be inspected with `git
 | `aws-access-key` | `CRITICAL` | AWS Access Key ID | 20-character identifier starting with `AKIA` |
 | `aws-secret-key` | `CRITICAL` | AWS Secret Access Key | 40-character secret patterns bound to AWS key variables |
 | `github-pat` | `CRITICAL` | GitHub Personal Access Token | Modern prefixed tokens (`ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_`, `github_pat_`) |
+| `gitlab-pat` | `CRITICAL` | GitLab Personal Access Token | GitLab personal and project tokens (`glpat-...`) |
+| `stripe-api-key` | `CRITICAL` | Stripe API Key | Live standard and restricted keys (`sk_live_`, `rk_live_`) |
+| `openai-api-key` | `CRITICAL` | OpenAI API Key | Legacy and project-scoped keys (`sk-`, `sk-proj-`) |
+| `slack-webhook` | `HIGH` | Slack Incoming Webhook | Slack webhook URLs (`hooks.slack.com/services/...`) |
+| `azure-storage-key` | `CRITICAL` | Azure Storage Account Key | `AccountKey` and `SharedAccessKey` values |
 | `jwt` | `HIGH` | JSON Web Token | Three-segment Base64URL-encoded tokens (`ey...`) |
 | `db-connection-string` | `HIGH` | Database Connection URI | Embedded credentials in MongoDB, PostgreSQL, and MySQL connection strings |
 | `private-key` | `CRITICAL` | Private Key Block | PEM private key boundaries (`-----BEGIN ... PRIVATE KEY-----`) |
 | `slack-token` | `HIGH` | Slack Access Token | Slack user, bot, and app tokens (`xox[baprs]-...`) |
 | `google-api-key` | `HIGH` | Google API Key | Google Cloud and service keys starting with `AIza` |
-| `generic-api-key` | `MEDIUM` | Generic API Secret | High-entropy string assignments (quoted or unquoted `.env` format) |
+| `generic-api-key` | `MEDIUM` | Generic API Secret | Quoted or unquoted assignments validated with $H(X) \ge 3.0$ entropy |
 | `generic-bearer-token` | `HIGH` | Generic Bearer Token | Bearer authorization tokens (minimum 20 characters) |
 | `generic-password` | `MEDIUM` | Generic Password Assignment | Hardcoded passwords in source code or `.env` configurations |
 
@@ -231,9 +289,9 @@ src/
 ├── cli/              # Commander CLI entrypoint, argument parsing, error routing
 ├── config/           # Zod schema validation and upward .gitleak-radar.json loader
 ├── detectors/        # Regex pattern matching rules, keyword pre-filtering, and detector logic
-├── git/              # Git root resolution, index blob reader, and staged diff filtering
+├── git/              # Git root resolution, index blob reader, staged diff, and history scanning
 ├── hooks/            # Idempotent fail-closed Git pre-commit hook installer
-├── reporters/        # Chalk terminal and JSON report formatters
+├── reporters/        # Chalk terminal, JSON, and SARIF report formatters
 ├── scanner/          # File filtering, symlink guards, 10MB size guard, and orchestrator pipeline
 ├── scoring/          # 0-100 normalized security score algorithm
 └── types/            # TypeScript interfaces (Finding, ScanResult, ScanOptions)
@@ -242,8 +300,9 @@ tests/
 ├── cli/              # CLI integration and argument tests
 ├── config/           # Zod validation and upward traversal tests
 ├── detectors/        # Pattern detection, pre-filter, and false-positive filter tests
-├── git/              # Git root resolution, staged diff, and index isolation tests
+├── git/              # Git root resolution, staged diff, index isolation, and history tests
 ├── hooks/            # Pre-commit hook installer and fail-closed posture tests
+├── reporters/        # SARIF v2.1.0 reporter tests
 ├── scanner/          # File exclusion, binary, and 10MB limit tests
 ├── scoring/          # Security score calculation tests
 └── security/         # ReDoS, path traversal, and symlink hardening tests
@@ -265,7 +324,7 @@ pnpm install
 # Run TypeScript typechecks
 pnpm typecheck
 
-# Run the Vitest test suite (54 automated tests)
+# Run the Vitest test suite (70 automated tests)
 pnpm test
 
 # Build the production bundle
@@ -286,8 +345,6 @@ npm pack --dry-run
 
 The following capabilities are planned for upcoming releases:
 
-- [ ] Shannon entropy analysis to supplement regex heuristics
-- [ ] SARIF reporter support for native GitHub Code Scanning integration
 - [ ] Configurable maximum file size limits via CLI and `.gitleak-radar.json`
 - [ ] Custom user-defined regex rules in configuration
 

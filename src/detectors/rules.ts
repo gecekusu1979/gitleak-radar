@@ -7,7 +7,7 @@ export const DETECTION_RULES: DetectionRule[] = [
     description: "Identifies standard AWS Access Key IDs (AKIA...)",
     severity: "critical",
     pattern: /\b(AKIA[0-9A-Z]{16})\b/g,
-    keywords: ["AKIA"]
+    keywords: ["akia"]
   },
   {
     id: "aws-secret-key",
@@ -26,6 +26,46 @@ export const DETECTION_RULES: DetectionRule[] = [
     keywords: ["ghp_", "gho_", "ghu_", "ghs_", "ghr_", "github_pat_"]
   },
   {
+    id: "gitlab-pat",
+    name: "GitLab Personal Access Token",
+    description: "Identifies GitLab personal and project access tokens",
+    severity: "critical",
+    pattern: /\b(glpat-[0-9a-zA-Z\-_]{20,32})\b/g,
+    keywords: ["glpat-"]
+  },
+  {
+    id: "stripe-api-key",
+    name: "Stripe API Key",
+    description: "Identifies live Stripe standard and restricted secret keys",
+    severity: "critical",
+    pattern: /\b((?:sk|rk)_live_[0-9a-zA-Z]{24,34})\b/g,
+    keywords: ["sk_live_", "rk_live_"]
+  },
+  {
+    id: "openai-api-key",
+    name: "OpenAI API Key",
+    description: "Identifies legacy and project-scoped OpenAI secret keys",
+    severity: "critical",
+    pattern: /\b(sk-(?:proj-)?[A-Za-z0-9_-]{48,64})\b/g,
+    keywords: ["sk-"]
+  },
+  {
+    id: "slack-webhook",
+    name: "Slack Incoming Webhook",
+    description: "Identifies published Slack incoming webhook URIs",
+    severity: "high",
+    pattern: /https:\/\/hooks\.slack\.com\/services\/T[A-Z0-9_]+\/B[A-Z0-9_]+\/[A-Za-z0-9]+/g,
+    keywords: ["hooks.slack.com"]
+  },
+  {
+    id: "azure-storage-key",
+    name: "Azure Storage Account Key",
+    description: "Identifies Azure Storage access keys and connection string keys",
+    severity: "critical",
+    pattern: /(?:AccountKey|SharedAccessKey)\s*[:=]\s*["']?([A-Za-z0-9+/=]{86,88})["']?/gi,
+    keywords: ["accountkey", "sharedaccesskey"]
+  },
+  {
     id: "jwt",
     name: "JSON Web Token (JWT)",
     description: "Identifies hardcoded base64-encoded JWT signatures",
@@ -39,7 +79,7 @@ export const DETECTION_RULES: DetectionRule[] = [
     description: "Identifies RSA, EC, OPENSSH or standard Private Keys",
     severity: "critical",
     pattern: /-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/g,
-    keywords: ["BEGIN", "PRIVATE KEY"]
+    keywords: ["begin", "private key"]
   },
   {
     id: "slack-token",
@@ -55,7 +95,7 @@ export const DETECTION_RULES: DetectionRule[] = [
     description: "Identifies Google Cloud and service API keys",
     severity: "high",
     pattern: /\b(AIza[0-9A-Za-z\\-_]{35})\b/g,
-    keywords: ["AIza"]
+    keywords: ["aiza"]
   },
   {
     id: "db-connection-string",
@@ -70,6 +110,8 @@ export const DETECTION_RULES: DetectionRule[] = [
     name: "Generic API Key",
     description: "Identifies assignments of high-entropy strings to api_key variables",
     severity: "medium",
+    requiresEntropy: true,
+    minEntropy: 3.0,
     pattern: /(?:api_key|apikey|secret|api_token)\s*[:=]\s*["']?([A-Za-z0-9\-_]{20,64})["']?/gi,
     keywords: ["api_key", "apikey", "secret", "api_token"]
   },
@@ -90,3 +132,4 @@ export const DETECTION_RULES: DetectionRule[] = [
     keywords: ["password", "passwd", "pwd"]
   }
 ];
+

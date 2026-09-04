@@ -1,6 +1,6 @@
 {
   "name": "gitleak-radar",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Fast, local-first source code secret scanner and pre-commit gate CLI.",
   "keywords": [
     "security",
@@ -25,7 +25,8 @@
   },
   "type": "module",
   "bin": {
-    "gitleak-radar": "./dist/cli/index.js"
+    "gitleak-radar": "./dist/cli/index.js",
+    "gitleak": "./dist/cli/index.js"
   },
   "files": [
     "dist",
@@ -37,7 +38,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "clean": "node -e \"try{fs.rmSync('dist',{recursive:true,force:true})}catch(e){}\""
+    "clean": "node -e \"try{fs.rmSync('dist',{recursive:true,force:true})}catch(e){}\"",
+    "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build"
   },
   "dependencies": {
     "chalk": "^5.3.0",
@@ -50,5 +52,17 @@
     "@types/node": "^20.11.0",
     "typescript": "^5.3.3",
     "vitest": "^3.2.6"
+  },
+  "main": "./dist/scanner/scanner.js",
+  "types": "./dist/scanner/scanner.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/scanner/scanner.d.ts",
+      "import": "./dist/scanner/scanner.js"
+    },
+    "./sarif": {
+      "types": "./dist/reporters/sarif.d.ts",
+      "import": "./dist/reporters/sarif.js"
+    }
   }
 }

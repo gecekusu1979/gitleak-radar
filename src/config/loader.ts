@@ -1,4 +1,4 @@
-﻿import fs from "node:fs/promises";
+import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
 import { DETECTION_RULES } from "../detectors/rules.js";
@@ -58,7 +58,7 @@ export async function loadConfig(targetDir: string): Promise<RadarConfig> {
     const configPath = path.join(currentDir, ".gitleak-radar.json");
     let raw: string;
     try {
-      raw = await fs.readFile(configPath, "utf-8");
+      raw = (await fs.readFile(configPath, "utf-8")).replace(/^\uFEFF/, "");
     } catch (err: any) {
       if (err?.code === "ENOENT") {
         const parent = path.dirname(currentDir);

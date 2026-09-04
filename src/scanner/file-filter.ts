@@ -112,3 +112,36 @@ export function isPlaceholderOrExample(
 
   return false;
 }
+
+/**
+ * Hem dahili hariç tutulanları hem de özel desenleri (glob/uzantı/dizin) doğrular.
+ */
+export function shouldIgnorePath(filePath: string, customIgnores: string[] = []): boolean {
+  if (shouldIgnoreFile(filePath)) {
+    return true;
+  }
+
+  const normalized = filePath.replace(/\\/g, "/");
+
+  for (const pattern of customIgnores) {
+    if (!pattern) continue;
+    const clean = pattern.replace(/^\*\*\//, "").replace(/\/\*\*$/, "");
+
+    if (clean.startsWith("*.")) {
+      const ext = clean.slice(1);
+      if (normalized.endsWith(ext)) {
+        return true;
+      }
+    }
+
+    if (
+      normalized === clean ||
+      normalized.includes(clean) ||
+      normalized.endsWith(`/${clean}`)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
