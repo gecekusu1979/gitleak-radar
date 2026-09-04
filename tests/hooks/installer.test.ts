@@ -36,4 +36,15 @@ describe("installPreCommitHook", () => {
       expect(stats.mode & 0o100).not.toBe(0);
     }
   });
+
+  it("enforces fail-closed posture by exiting with code 2 if scanner is missing", async () => {
+    const hookPath = path.join(tempDir, ".git", "hooks", "pre-commit");
+    const result = await installPreCommitHook(tempDir, "medium");
+    expect(result.success).toBe(true);
+
+    const written = await fs.readFile(hookPath, "utf-8");
+    expect(written).toContain("Commit blocked (fail-closed)");
+    expect(written).toContain("exit 2");
+    expect(written).not.toContain("Skipping check");
+  });
 });

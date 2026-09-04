@@ -17,8 +17,26 @@ export interface ReadFileResult {
 
 export function readTextFileSafe(filePath: string): ReadFileResult {
   try {
-    const stats = fsSync.statSync(filePath);
-    if (stats.size > MAX_FILE_SIZE_BYTES) {
+    let stats: any = null;
+    if (typeof fsSync.lstatSync === "function") {
+      try {
+        const lstatRes = fsSync.lstatSync(filePath);
+        if (lstatRes && (typeof lstatRes.size === "number" || typeof lstatRes.isSymbolicLink === "function")) {
+          stats = lstatRes;
+        }
+      } catch {
+        // fallback
+      }
+    }
+
+    if (!stats) {
+      stats = fsSync.statSync(filePath);
+    }
+
+    if (typeof stats?.isSymbolicLink === "function" && stats.isSymbolicLink()) {
+      return { content: null, skipped: true, reason: "symbolic links are ignored for security" };
+    }
+    if (stats && stats.size > MAX_FILE_SIZE_BYTES) {
       return { content: null, skipped: true, reason: "exceeds maximum size (10MB)" };
     }
     const content = fsSync.readFileSync(filePath, "utf-8");
@@ -30,8 +48,26 @@ export function readTextFileSafe(filePath: string): ReadFileResult {
 
 export async function readFileLines(filePath: string): Promise<FileContent | null> {
   try {
-    const stats = await fs.stat(filePath);
-    if (stats.size > MAX_FILE_SIZE_BYTES) {
+    let stats: any = null;
+    if (typeof fs.lstat === "function") {
+      try {
+        const lstatRes = await fs.lstat(filePath);
+        if (lstatRes && (typeof lstatRes.size === "number" || typeof lstatRes.isSymbolicLink === "function")) {
+          stats = lstatRes;
+        }
+      } catch {
+        // fallback
+      }
+    }
+
+    if (!stats) {
+      stats = await fs.stat(filePath);
+    }
+
+    if (typeof stats?.isSymbolicLink === "function" && stats.isSymbolicLink()) {
+      return null;
+    }
+    if (stats && stats.size > MAX_FILE_SIZE_BYTES) {
       return null;
     }
 

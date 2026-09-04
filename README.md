@@ -8,13 +8,18 @@
 
 > **Static credential scanner and automated Git pre-commit hook designed to detect exposed API keys, access tokens, private keys, and database connection strings before code is committed or pushed.**
 
-GitLeak Radar runs locally across your codebase or directly against the staged Git index. It uses regex-based pattern matching, scans test and fixture directories by default, accurately identifies unquoted `.env` secrets, filters out dummy placeholders without dropping real test credentials, masks matched secrets in memory, computes a 0–100 repository security score, and enforces workflow gates using standard UNIX exit codes.
+GitLeak Radar runs locally across your codebase or directly against the staged Git index. It uses regex-based pattern matching with keyword pre-filtering, scans test and fixture directories by default, accurately identifies unquoted `.env` secrets, filters out dummy placeholders without dropping real test credentials, masks matched secrets in memory, computes a 0–100 repository security score, and enforces fail-closed workflow gates using standard UNIX exit codes.
 
 ---
 
 ## Key Features
 
+- **True Git Index Isolation:** In `--staged` mode, files are evaluated directly from Git's object database (`git show :<path>`). Modifying or clearing a secret from the working directory after staging cannot bypass detection.
+- **Fail-Closed Pre-Commit Security:** Hook scripts enforce a fail-closed posture (`exit 2`). If `gitleak-radar` or `npx` cannot be executed, commits are blocked rather than silently skipped.
+- **Monorepo & Nested Config Traversal:** `.gitleak-radar.json` configurations are resolved through upward filesystem traversal from the target path.
+- **High-Performance Keyword Pre-Filtering:** Fast substring pre-screening via `rule.keywords` eliminates unnecessary regex evaluations on unrelated lines.
 - **Leak-Safe Finding Contract:** Plaintext secrets are excluded from the core `Finding` data model. Terminal and JSON reporters exclusively expose masked fingerprints (e.g., `AKIA********1234`).
+- **Self-Security Hardening:** Hardened against ReDoS on minified bundles (`MAX_LINE_LENGTH = 8192`), symlink traversal exploits (`fs.lstat` and Git mode `120000`), and Git CLI argument injection (`--` option delimiters).
 - **Default Test Directory Coverage:** `tests/` and `test/` directories are scanned by default to prevent hardcoded credentials from leaking through test fixtures or mock environments.
 - **Unquoted `.env` Secret Detection:** Robust capture rules support both quoted and unquoted environment variable definitions (e.g., `API_KEY=sk_live_...`), preserving comments and boundary safety.
 - **Path-Aware Placeholder Filtering:** Distinct placeholder logic ensures real credentials containing words like `test` or `dummy` (e.g., `sk_test_...`) in production code are never filtered out, while documentation and fixtures retain test-token bypasses.
@@ -24,7 +29,7 @@ GitLeak Radar runs locally across your codebase or directly against the staged G
 - **Large File Protection:** Skips files larger than 10MB (`MAX_FILE_SIZE_BYTES`) before buffering into memory to prevent process exhaustion.
 - **Binary & Ignore Handling:** Automatically bypasses null-byte binary buffers, `.git`, `node_modules`, `dist`, `build`, and lockfiles. User files named `rules.ts` or `detector.ts` outside internal engine directories are fully scanned.
 - **Strict Config Validation:** `.gitleak-radar.json` configurations are verified with Zod for known rule IDs and checked against malformed glob syntax.
-- **Deterministic Exit Codes:** Strict exit code convention (`0`, `1`, `2`) for pipeline and shell integration.
+- **Deterministic Exit Codes:** Strict exit code conventions (`0`, `1`, `2`) for robust pipeline and shell automation.
 
 ## Architecture
 
@@ -32,25 +37,30 @@ The following diagram illustrates the execution path from CLI entry to exit code
 
 ```mermaid
 flowchart TD
-    A[CLI Invocation / Git Hook] --> B{Scan Target}
-    B -->|Directory Path| C[FastGlob Traversal]
-    B -->|--staged Flag| D[Git Index Diff Filter: --diff-filter=d]
-    C --> E[Ignore & Exclusion Filters]
+    A[CLI Invocation / Pre-commit Hook] --> B{Scan Mode}
+    B -->|Filesystem Path| C[FastGlob Traversal]
+    B -->|--staged Flag| D[Git Index Diff: --cached --diff-filter=d]
+    C --> E[Path Exclusion & Ignore Filters]
     D --> E
-    E --> F{File Size <= 10MB?}
-    F -->|No| G[Skip File Safely]
-    F -->|Yes| H[Safe File Reader]
-    H --> I{Binary Check: Null Byte?}
-    I -->|Yes| J[Skip Binary File]
-    I -->|No| K[Detector Engine: Regex Rules]
-    K --> L[Path-Aware Placeholder Filter]
-    L --> M[Deterministic Masking: Max 2 Boundary Chars]
-    M --> N[Finding Model Assembly]
-    N --> O[Security Scorer: File-Deduplicated 0 to 100]
-    O --> P{Findings Count > 0?}
-    P -->|Yes| Q[Terminal / JSON Reporter] --> R[Exit Code 1: Fail / Block]
-    P -->|No| S[Clean Summary Reporter] --> T[Exit Code 0: Pass]
-    U[Invalid CLI Args / Malformed Config / Runtime Error] --> V[Standard Error Log] --> W[Exit Code 2: Error]
+    E --> F{Symlink Check}
+    F -->|Symlink / Path Traversal| G[Skip File Safely]
+    F -->|Regular File / Blob| H{File Size <= 10MB?}
+    H -->|Exceeds Limit| G
+    H -->|Within Limit| I[Read Staged Blob / FS Buffer]
+    I --> J{Binary Check: Null Byte?}
+    J -->|Yes| K[Skip Binary File]
+    J -->|No| L[Line Chunking: Max 8KB Window]
+    L --> M{Keyword Pre-filter Match?}
+    M -->|No| N[Skip Regex Evaluation]
+    M -->|Yes| O[Detector Engine: Regex Rules]
+    O --> P[Path-Aware Placeholder Filter]
+    P --> Q[Deterministic Masking: Max 2 Boundary Chars]
+    Q --> R[Finding Model Assembly]
+    R --> S[Security Scorer: File-Deduplicated 0 to 100]
+    S --> T{Findings Count > 0?}
+    T -->|Yes| U[Terminal / JSON Reporter] --> V[Exit Code 1: Findings Block]
+    T -->|No| W[Clean Summary Reporter] --> X[Exit Code 0: Pass]
+    Y[Invalid CLI Args / Malformed Config / Missing Hook Tool] --> Z[Standard Error Log] --> AA[Exit Code 2: Fail-Closed Error]
 ```
 
 ## Quick Start
@@ -101,15 +111,18 @@ To configure a minimum severity threshold for commits:
 gitleak-radar install-hook -s high
 ```
 
-Once configured, any commit containing matching secrets is automatically intercepted and aborted:
+### Fail-Closed Behavior
+
+The pre-commit hook runs in **fail-closed mode**: if `gitleak-radar` or `npx` is not available in the execution environment, commits are blocked with exit code `2` to prevent uninspected code from entering version control. Commits can be bypassed explicitly when needed using `git commit --no-verify`.
 
 ```bash
 git add .
 git commit -m "feat: add payment gateway credentials"
 
-# Scanning for secrets...
-# ✖ AWS Access Key ID detected in src/config.ts:14
-# Commit blocked. Exit code 1.
+# 🕵️ GitLeak Radar: Scanning staged files...
+# ❌ Commit blocked: Sensitive credentials detected in staged changes.
+# Please unstage or mask secrets before committing.
+# Exit code 1.
 ```
 
 ## CLI Reference
@@ -168,7 +181,7 @@ All rules are defined in `src/detectors/rules.ts` and can be inspected with `git
 
 ## Configuration (`.gitleak-radar.json`)
 
-To configure custom path exclusions or disable specific rules, add an optional `.gitleak-radar.json` file to the root of your project:
+To configure path exclusions or toggle specific rules, add an optional `.gitleak-radar.json` file to your project:
 
 ```json
 {
@@ -181,6 +194,10 @@ To configure custom path exclusions or disable specific rules, add an optional `
 }
 ```
 
+### Monorepo & Upward Traversal
+
+When scanning subdirectories or packages (for example, `gitleak-radar scan packages/backend`), the scanner traverses upward from the target directory until it locates `.gitleak-radar.json`.
+
 ### Schema Rules & Error Handling
 
 - **`ignore`**: Array of glob path strings to skip during directory scans. Unbalanced brackets or braces (e.g. `[unclosed/` or `foo}`) trigger an explicit configuration error.
@@ -189,11 +206,13 @@ To configure custom path exclusions or disable specific rules, add an optional `
 
 ## Security Model
 
-- **Safe Process Invocation:** All Git commands (`rev-parse`, `diff`) run through `child_process.execFile` with isolated argument arrays. Shell string concatenation is not used, preventing command injection.
-- **Fingerprinting Only:** The `Finding` interface does not contain a raw secret field. Reporters receive masked representations instead of plaintext credentials.
-- **Strict Masking:** Masking exposes at most 2 boundary characters for secrets up to 16 characters, preventing exposure of significant plaintext portions.
-- **Pre-read Size Guard:** File size is verified via filesystem metadata (`fs.stat`) prior to reading contents into memory, safely skipping buffers larger than 10MB.
-- **Zero Network Interaction:** GitLeak Radar contains no network dependencies, telemetry emitters, or cloud connections. Scanning logic executes entirely on the local host.
+- **True Index Isolation:** Staged file scans evaluate the Git index blob rather than the working tree, closing bypass windows where staged secrets are wiped from disk before a commit.
+- **Symlink Traversal Protection:** Symlinks are rejected via `fs.lstat` and Git object mode `120000`, preventing arbitrary file disclosure of external host targets.
+- **ReDoS Defense:** Scanned lines are bounded by `MAX_LINE_LENGTH = 8192`, preventing catastrophic backtracking when inspecting massive single-line minified files.
+- **Git Argument Injection Delimiters:** Git CLI invocations isolate target paths behind explicit `--` option terminators.
+- **Safe Process Invocation:** All Git commands run through `child_process.execFile` with isolated argument vectors. Shell string concatenation is avoided.
+- **Fingerprinting Only:** The `Finding` model omits raw secret values. Reporters receive masked strings instead of plaintext credentials.
+- **Zero Network Interaction:** GitLeak Radar contains zero network dependencies, telemetry emitters, or cloud connections. Scanning logic executes entirely on the local host.
 
 ## Exit Codes
 
@@ -203,29 +222,31 @@ GitLeak Radar follows POSIX exit conventions for standard shell and CI/CD integr
 | --- | --- | --- |
 | `0` | Clean | Scan completed successfully with zero findings above the selected severity. |
 | `1` | Findings Detected | One or more active secrets matching the criteria were detected. |
-| `2` | Execution Error | Scan aborted due to invalid arguments, malformed JSON configuration, or runtime failures. |
+| `2` | Execution Error / Fail-Closed | Scan aborted due to missing tools, invalid arguments, malformed JSON configuration, or runtime failures. |
 
 ## Repository Structure
 
 ```text
 src/
 ├── cli/              # Commander CLI entrypoint, argument parsing, error routing
-├── config/           # Zod schema validation and .gitleak-radar.json loading
-├── detectors/        # Regex pattern matching rules and secret detector logic
-├── git/              # Git root resolution and staged diff filtering
-├── hooks/            # Idempotent Git pre-commit hook installer
+├── config/           # Zod schema validation and upward .gitleak-radar.json loader
+├── detectors/        # Regex pattern matching rules, keyword pre-filtering, and detector logic
+├── git/              # Git root resolution, index blob reader, and staged diff filtering
+├── hooks/            # Idempotent fail-closed Git pre-commit hook installer
 ├── reporters/        # Chalk terminal and JSON report formatters
-├── scanner/          # File filtering, 10MB size guard, and orchestrator pipeline
+├── scanner/          # File filtering, symlink guards, 10MB size guard, and orchestrator pipeline
 ├── scoring/          # 0-100 normalized security score algorithm
 └── types/            # TypeScript interfaces (Finding, ScanResult, ScanOptions)
 
 tests/
 ├── cli/              # CLI integration and argument tests
-├── config/           # Zod validation and invalid configuration tests
-├── detectors/        # Pattern detection and false-positive filter tests
-├── git/              # Git root resolution and staged diff tests
+├── config/           # Zod validation and upward traversal tests
+├── detectors/        # Pattern detection, pre-filter, and false-positive filter tests
+├── git/              # Git root resolution, staged diff, and index isolation tests
+├── hooks/            # Pre-commit hook installer and fail-closed posture tests
 ├── scanner/          # File exclusion, binary, and 10MB limit tests
-└── scoring/          # Security score calculation tests
+├── scoring/          # Security score calculation tests
+└── security/         # ReDoS, path traversal, and symlink hardening tests
 ```
 
 ## Development & Testing
@@ -244,7 +265,7 @@ pnpm install
 # Run TypeScript typechecks
 pnpm typecheck
 
-# Run the Vitest test suite
+# Run the Vitest test suite (54 automated tests)
 pnpm test
 
 # Build the production bundle

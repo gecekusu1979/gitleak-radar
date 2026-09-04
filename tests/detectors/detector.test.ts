@@ -103,4 +103,33 @@ describe("SecretDetector - Rules & Masking", () => {
     expect(masked.endsWith("56")).toBe(true);
     expect(masked).toBe("ab********56");
   });
+
+  it("skips regex evaluation when keyword prefilter does not match", () => {
+    let regexExecuted = false;
+    const customRule = {
+      id: "custom-test-rule",
+      name: "Custom Test Rule",
+      description: "Testing prefilter",
+      severity: "high" as const,
+      keywords: ["secret_token_marker"],
+      pattern: {
+        get lastIndex() { return 0; },
+        set lastIndex(_) {},
+        exec: () => {
+          regexExecuted = true;
+          return null;
+        }
+      } as unknown as RegExp
+    };
+
+    const detector = new SecretDetector([customRule]);
+
+    // 1. Keyword içermeyen satırda regex hiç tetiklenmemeli
+    detector.scanLine("normal line with no matching token", 1, "test.js");
+    expect(regexExecuted).toBe(false);
+
+    // 2. Keyword içeren satırda regex tetiklenmeli
+    detector.scanLine("contains SECRET_TOKEN_MARKER here", 2, "test.js");
+    expect(regexExecuted).toBe(true);
+  });
 });

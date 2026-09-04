@@ -26,8 +26,9 @@ if command -v gitleak-radar >/dev/null 2>&1; then
 elif command -v npx >/dev/null 2>&1; then
   SCANNER_CMD="npx --no-install gitleak-radar"
 else
-  echo "⚠️ GitLeak Radar not found in PATH or npx. Skipping check."
-  exit 0
+  echo "⚠️ GitLeak Radar not found in PATH or npx. Security check could not run."
+  echo "Commit blocked (fail-closed). Install gitleak-radar or use --no-verify to bypass."
+  exit 2
 fi
 
 echo "🕵️  GitLeak Radar: Scanning staged files..."
@@ -78,3 +79,4 @@ fi
     return { success: false, message: (err as Error).message };
   }
 }
+

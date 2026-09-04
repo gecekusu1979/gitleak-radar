@@ -1,4 +1,5 @@
-﻿import { DetectionRule, Finding, Severity, SeverityOrder } from "../types/index.js";
+﻿export const MAX_LINE_LENGTH = 8192;
+import { DetectionRule, Finding, Severity, SeverityOrder } from "../types/index.js";
 import { isPlaceholderOrExample } from "../scanner/file-filter.js";
 
 export class SecretDetector {
@@ -26,21 +27,32 @@ export class SecretDetector {
     minSeverity: Severity = "low"
   ): Finding[] {
     const findings: Finding[] = [];
+    // ReDoS Koruması: Aşırı uzun minified satırlarda regex kilitlenmesini önle
+    const targetLine = line.length > MAX_LINE_LENGTH ? line.slice(0, MAX_LINE_LENGTH) : line;
     const minRank = SeverityOrder[minSeverity];
+    const lowerLine = targetLine.toLowerCase();
 
     for (const rule of this.rules) {
       if (SeverityOrder[rule.severity] < minRank) {
         continue;
       }
 
+      // Keyword pre-filtering: Kuralda keyword tanımlıysa ve satırda hiçbiri yoksa regex'i atla
+      if (rule.keywords && rule.keywords.length > 0) {
+        const hasKeyword = rule.keywords.some((k) => lowerLine.includes(k.toLowerCase()));
+        if (!hasKeyword) {
+          continue;
+        }
+      }
+
       rule.pattern.lastIndex = 0;
       let match: RegExpExecArray | null;
 
-      while ((match = rule.pattern.exec(line)) !== null) {
+      while ((match = rule.pattern.exec(targetLine)) !== null) {
         const rawSecret = match[1] ?? match[0];
         const index = match.index;
 
-        if (isPlaceholderOrExample(rawSecret, line, filePath)) {
+        if (isPlaceholderOrExample(rawSecret, targetLine, filePath)) {
           continue;
         }
 
@@ -59,3 +71,4 @@ export class SecretDetector {
     return findings;
   }
 }
+

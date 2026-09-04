@@ -4,10 +4,10 @@ import { Finding, ScanOptions, ScanResult } from "../types/index.js";
 import { SecretDetector } from "../detectors/detector.js";
 import { DETECTION_RULES } from "../detectors/rules.js";
 import { EXCLUDED_DIRECTORIES, shouldIgnoreFile } from "./file-filter.js";
-import { readFileLines } from "./file-reader.js";
+import { readFileLines, type FileContent } from "./file-reader.js";
 import { calculateSecurityScore } from "../scoring/scorer.js";
 import { loadConfig } from "../config/loader.js";
-import { getStagedFiles, isInsideGitRepo } from "../git/staged.js";
+import { getStagedFiles, isInsideGitRepo, getGitRoot, readStagedFileLines } from "../git/staged.js";
 
 export class ProjectScanner {
   public async scan(options: ScanOptions): Promise<ScanResult> {
@@ -58,7 +58,15 @@ export class ProjectScanner {
       }
 
       const absolutePath = path.resolve(targetDir, normalizedPath);
-      const fileData = await readFileLines(absolutePath);
+      let fileData: FileContent | null = null;
+
+      if (options.staged) {
+        const gitRoot = await getGitRoot(targetDir);
+        const relToGitRoot = path.relative(gitRoot, absolutePath).replace(/\\/g, "/");
+        fileData = await readStagedFileLines(gitRoot, relToGitRoot);
+      } else {
+        fileData = await readFileLines(absolutePath);
+      }
 
       if (!fileData) {
         options.onFileAction?.(normalizedPath, "binary");

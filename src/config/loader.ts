@@ -52,35 +52,44 @@ const DEFAULT_CONFIG: RadarConfig = {
 };
 
 export async function loadConfig(targetDir: string): Promise<RadarConfig> {
-  const configPath = path.resolve(targetDir, ".gitleak-radar.json");
-  let raw: string;
-  try {
-    raw = await fs.readFile(configPath, "utf-8");
-  } catch (err: any) {
-    if (err.code === "ENOENT") {
-      return DEFAULT_CONFIG;
+  let currentDir = path.resolve(targetDir);
+
+  while (true) {
+    const configPath = path.join(currentDir, ".gitleak-radar.json");
+    let raw: string;
+    try {
+      raw = await fs.readFile(configPath, "utf-8");
+    } catch (err: any) {
+      if (err?.code === "ENOENT") {
+        const parent = path.dirname(currentDir);
+        if (parent === currentDir) {
+          return DEFAULT_CONFIG;
+        }
+        currentDir = parent;
+        continue;
+      }
+      throw err;
     }
-    throw err;
-  }
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (err: any) {
-    throw new Error(`Invalid .gitleak-radar.json: Malformed JSON (${err.message})`);
-  }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (err: any) {
+      throw new Error(`Invalid .gitleak-radar.json: Malformed JSON (${err.message})`);
+    }
 
-  const result = ConfigSchema.safeParse(parsed);
-  if (!result.success) {
-    const issues = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
-    throw new Error(
-      `Invalid .gitleak-radar.json: ${issues}\nValid rule IDs: ${VALID_RULE_IDS.join(", ")}`
-    );
-  }
+    const result = ConfigSchema.safeParse(parsed);
+    if (!result.success) {
+      const issues = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+      throw new Error(
+        `Invalid .gitleak-radar.json: ${issues}\nValid rule IDs: ${VALID_RULE_IDS.join(", ")}`
+      );
+    }
 
-  for (const pattern of result.data.ignore) {
-    validateGlobPattern(pattern);
-  }
+    for (const pattern of result.data.ignore) {
+      validateGlobPattern(pattern);
+    }
 
-  return result.data;
+    return result.data;
+  }
 }

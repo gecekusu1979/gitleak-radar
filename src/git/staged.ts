@@ -2,6 +2,7 @@
 import { promisify } from "node:util";
 import path from "node:path";
 import fs from "node:fs/promises";
+import { type FileContent, MAX_FILE_SIZE_BYTES } from "../scanner/file-reader.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -31,8 +32,7 @@ export async function getStagedFiles(targetDir: string): Promise<string[]> {
 
   const gitRoot = await getGitRoot(targetDir);
 
-  // Name-only staged files excluding deleted (filter=d)
-  const { stdout } = await execFileAsync("git", ["diff", "--cached", "--name-only", "--diff-filter=d"], {
+  const { stdout } = await execFileAsync("git", ["diff", "--cached", "--name-only", "--diff-filter=d", "--"], {
     cwd: gitRoot
   });
 
@@ -44,7 +44,6 @@ export async function getStagedFiles(targetDir: string): Promise<string[]> {
     try {
       const stat = await fs.stat(absoluteFilePath);
       if (stat.isFile()) {
-        // targetDir'e göre göreceli yol (scanner'ın path.resolve(targetDir, ...) ile uyumlu olması için)
         const relToTarget = path.relative(targetDir, absoluteFilePath);
         existingFiles.push(relToTarget.replace(/\\/g, "/"));
       }
@@ -54,4 +53,62 @@ export async function getStagedFiles(targetDir: string): Promise<string[]> {
   }
 
   return existingFiles;
+}
+
+export async function readStagedFileLines(
+  gitRoot: string,
+  relativeToGitRoot: string
+): Promise<FileContent | null> {
+  const normalizedRelPath = relativeToGitRoot.replace(/\\/g, "/");
+  const absolutePath = path.resolve(gitRoot, normalizedRelPath);
+
+  // Path Traversal Koruması: Dosya yolu gitRoot dışına çıkamaz
+  const relativeCheck = path.relative(gitRoot, absolutePath);
+  if (relativeCheck.startsWith("..") || path.isAbsolute(relativeCheck)) {
+    return null;
+  }
+
+  // Symlink Koruması: Git Index nesne modu 120000 (symlink) ise okuma
+  try {
+    const { stdout: lsOut } = await execFileAsync("git", ["ls-files", "-s", "--", normalizedRelPath], { cwd: gitRoot });
+    if (lsOut.startsWith("120000")) {
+      return null;
+    }
+  } catch {
+    // ls-files çıktısı alınamazsa devam et
+  }
+
+  try {
+    const { stdout: sizeOut } = await execFileAsync("git", ["cat-file", "-s", `:${normalizedRelPath}`], {
+      cwd: gitRoot
+    });
+    const size = parseInt(sizeOut.trim(), 10);
+    if (!Number.isNaN(size) && size > MAX_FILE_SIZE_BYTES) {
+      return null;
+    }
+
+    const { stdout } = await execFileAsync("git", ["show", `:${normalizedRelPath}`], {
+      cwd: gitRoot,
+      encoding: "buffer",
+      maxBuffer: MAX_FILE_SIZE_BYTES + 1024
+    });
+
+    const buffer = Buffer.isBuffer(stdout) ? stdout : Buffer.from(stdout);
+    const checkLength = Math.min(buffer.length, 1024);
+    for (let i = 0; i < checkLength; i++) {
+      if (buffer[i] === 0) {
+        return null;
+      }
+    }
+
+    const content = buffer.toString("utf8");
+    const lines = content.split(/\r?\n/);
+    return {
+      path: absolutePath,
+      lines,
+      totalLines: lines.length
+    };
+  } catch {
+    return null;
+  }
 }

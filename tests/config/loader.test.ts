@@ -10,7 +10,7 @@ describe("Config Loader", () => {
   });
 
   it("returns default config when .gitleak-radar.json does not exist", async () => {
-    vi.mocked(fs.readFile).mockRejectedValueOnce({ code: "ENOENT" });
+    vi.mocked(fs.readFile).mockRejectedValue({ code: "ENOENT" });
     const config = await loadConfig(".");
     expect(config.ignore).toEqual([]);
     expect(config.rules).toEqual({});
@@ -49,5 +49,18 @@ describe("Config Loader", () => {
     });
     vi.mocked(fs.readFile).mockResolvedValueOnce(unmatchedClosing);
     await expect(loadConfig(".")).rejects.toThrow(/Invalid glob pattern/);
+  });
+
+  it("finds config file in parent directory via upward traversal (monorepo support)", async () => {
+    const validJson = JSON.stringify({
+      ignore: ["packages/backend/dist/**"]
+    });
+    // İlk çağrı alt klasörde bulamaz (ENOENT), ikinci çağrı üst klasörde bulur
+    vi.mocked(fs.readFile)
+      .mockRejectedValueOnce({ code: "ENOENT" })
+      .mockResolvedValueOnce(validJson);
+
+    const config = await loadConfig("packages/backend");
+    expect(config.ignore).toEqual(["packages/backend/dist/**"]);
   });
 });
