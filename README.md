@@ -1,5 +1,9 @@
 # GitLeak Radar
 
+[![npm version](https://img.shields.io/npm/v/gitleak-radar.svg?color=cb3837)](https://www.npmjs.com/package/gitleak-radar)
+[![npm downloads](https://img.shields.io/npm/dm/gitleak-radar.svg)](https://www.npmjs.com/package/gitleak-radar)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 [![CI](https://github.com/gecekusu1979/gitleak-radar/actions/workflows/ci.yml/badge.svg)](https://github.com/gecekusu1979/gitleak-radar/actions)
 [![Tests](https://img.shields.io/badge/tests-70%2F70%20passing-brightgreen.svg)]()
 [![SARIF](https://img.shields.io/badge/SARIF-v2.1.0%20Compliant-blue.svg)]()
