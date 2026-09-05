@@ -1,10 +1,22 @@
-import fs from "node:fs/promises";
+﻿import fs from "node:fs/promises";
 import path from "node:path";
+import { Severity } from "../types/index.js";
+
+const VALID_SEVERITIES: ReadonlySet<string> = new Set<Severity>(["low", "medium", "high", "critical"]);
 
 export async function installPreCommitHook(
   targetDir: string = ".",
   severity: string = "low"
 ): Promise<{ success: boolean; message: string }> {
+  const normalizedSeverity = (severity || "").trim().toLowerCase();
+
+  if (!VALID_SEVERITIES.has(normalizedSeverity)) {
+    return {
+      success: false,
+      message: `Invalid severity level "${severity}". Allowed values: low, medium, high, critical.`
+    };
+  }
+
   const gitDir = path.resolve(targetDir, ".git");
   const hooksDir = path.join(gitDir, "hooks");
   const hookFile = path.join(hooksDir, "pre-commit");
@@ -26,23 +38,22 @@ if command -v gitleak-radar >/dev/null 2>&1; then
 elif command -v npx >/dev/null 2>&1; then
   SCANNER_CMD="npx --no-install gitleak-radar"
 else
-  echo "⚠️ GitLeak Radar not found in PATH or npx. Security check could not run."
+  echo "[!] GitLeak Radar not found in PATH or npx. Security check could not run."
   echo "Commit blocked (fail-closed). Install gitleak-radar or use --no-verify to bypass."
   exit 2
 fi
 
-echo "🕵️  GitLeak Radar: Scanning staged files..."
-$SCANNER_CMD scan --staged --severity ${severity}
+echo "[*] GitLeak Radar: Scanning staged files..."
+$SCANNER_CMD scan --staged --severity ${normalizedSeverity}
 SCAN_EXIT=$?
 
 if [ $SCAN_EXIT -eq 1 ]; then
   echo ""
-  echo "❌ Commit blocked: Sensitive credentials detected in staged changes."
-  echo "Please unstage or mask secrets before committing."
+  echo "[X] GitLeak Radar detected secrets blocking commit."
   exit 1
-elif [ $SCAN_EXIT -eq 2 ]; then
+elif [ $SCAN_EXIT -ne 0 ]; then
   echo ""
-  echo "⚠️ GitLeak Radar encountered an error during scan."
+  echo "[X] GitLeak Radar encountered an error during scan."
   exit 2
 fi
 # --- GITLEAK-RADAR-HOOK-END ---
@@ -65,7 +76,7 @@ fi
     await fs.writeFile(hookFile, updatedContent, { mode: 0o755 });
     await fs.chmod(hookFile, 0o755);
 
-    // Verify executable permissions on POSIX environments
+    // POSIX ortamlarında çalıştırma yetkisini teyit et
     if (process.platform !== "win32") {
       const fileStat = await fs.stat(hookFile);
       const isExecutable = (fileStat.mode & 0o111) !== 0;
@@ -79,4 +90,3 @@ fi
     return { success: false, message: (err as Error).message };
   }
 }
-

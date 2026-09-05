@@ -41,6 +41,30 @@ describe("Custom Rules Engine", () => {
     expect(() => compileCustomRule(def)).toThrowError(/Invalid regex in custom rule/);
   });
 
+  it("rejects custom rules with catastrophic-backtracking nested quantifiers", () => {
+    const def: CustomRuleDefinition = {
+      id: "evil-rule",
+      name: "Suspicious Token",
+      description: "Nested quantifier ReDoS pattern",
+      severity: "high",
+      regex: "(a+)+$"
+    };
+
+    expect(() => compileCustomRule(def)).toThrowError(/nested quantifiers|catastrophic backtracking/i);
+  });
+
+  it("still compiles benign rules containing repeated groups without nested quantifiers", () => {
+    const def: CustomRuleDefinition = {
+      id: "benign-repeat",
+      name: "Benign repeated group",
+      description: "Non-catastrophic pattern",
+      severity: "low",
+      regex: "(ab)+cd"
+    };
+
+    expect(() => compileCustomRule(def)).not.toThrow();
+  });
+
   it("enforces entropy thresholds on custom rules when configured", () => {
     const def: CustomRuleDefinition = {
       id: "entropy-token",
@@ -54,11 +78,9 @@ describe("Custom Rules Engine", () => {
     const rule = compileCustomRule(def);
     const detector = new SecretDetector([rule]);
 
-    // Düşük entropili (tekrarlayan) eşleşme filtrelenmeli
     const lowEntropy = detector.scanLine("SECRET_AAAAAAAAAAAAAAAA", 1, "dummy.ts");
     expect(lowEntropy).toHaveLength(0);
 
-    // Yüksek entropili rastgele anahtar yakalanmalı
     const highEntropy = detector.scanLine("SECRET_a8K9zX1mQ2wE4rTy", 1, "dummy.ts");
     expect(highEntropy).toHaveLength(1);
   });

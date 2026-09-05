@@ -4,7 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/gitleak-radar.svg)](https://www.npmjs.com/package/gitleak-radar)
 
 [![CI](https://github.com/gecekusu1979/gitleak-radar/actions/workflows/ci.yml/badge.svg)](https://github.com/gecekusu1979/gitleak-radar/actions)
-[![tests](https://img.shields.io/badge/tests-74%2F74%20passing-brightgreen)](https://github.com/gecekusu1979/gitleak-radar)
+[![tests](https://img.shields.io/badge/tests-77%2F77%20passing-brightgreen)](https://github.com/gecekusu1979/gitleak-radar)
 [![SARIF](https://img.shields.io/badge/SARIF-v2.1.0%20Compliant-blue.svg)]()
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict%20Mode-3178c6.svg)](https://www.typescriptlang.org/)

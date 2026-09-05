@@ -1,4 +1,4 @@
-import { Finding, ScoreReport, ScoreTier, Severity } from "../types/index.js";
+﻿import { Finding, ScoreReport, ScoreTier, Severity, SeverityOrder } from "../types/index.js";
 
 const PENALTIES: Record<Severity, number> = {
   critical: 35,
@@ -15,17 +15,32 @@ export function calculateSecurityScore(findings: Finding[]): ScoreReport {
     low: 0
   };
 
-  let totalPenalty = 0;
-  const uniquePenaltyKeys = new Set<string>();
-
+  // 1. Konum bazlı deduplikasyon: Aynı dosya, satır, sütun ve committe
+  // birden fazla kural tetiklenirse en yüksek ciddiyeti (severity) seç
+  const locationMap = new Map<string, Finding>();
   for (const finding of findings) {
-    counts[finding.severity]++;
-
-    const key = `${finding.ruleId}::${finding.file}`;
-    if (!uniquePenaltyKeys.has(key)) {
-      uniquePenaltyKeys.add(key);
-      totalPenalty += PENALTIES[finding.severity];
+    const locKey = `${finding.file}:${finding.line}:${finding.column}:${finding.commit ?? ""}`;
+    const existing = locationMap.get(locKey);
+    if (!existing) {
+      locationMap.set(locKey, finding);
+    } else {
+      const existingWeight = SeverityOrder[existing.severity] ?? 0;
+      const currentWeight = SeverityOrder[finding.severity] ?? 0;
+      if (currentWeight > existingWeight) {
+        locationMap.set(locKey, finding);
+      }
     }
+  }
+
+  const deduplicatedFindings = Array.from(locationMap.values());
+
+  // 2. Fiziksel olarak farklı konumdaki her gerçek sızıntı kendi cezasını öder.
+  // ruleId::file tavanı kaldırıldı; farklı satırlardaki sızıntılar skoru düşürür.
+  let totalPenalty = 0;
+
+  for (const finding of deduplicatedFindings) {
+    counts[finding.severity]++;
+    totalPenalty += PENALTIES[finding.severity];
   }
 
   const score = Math.max(0, 100 - totalPenalty);

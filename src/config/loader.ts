@@ -40,14 +40,28 @@ function validateGlobPattern(pattern: string): void {
   }
 }
 
+// Klasik "nested quantifier" catastrophic-backtracking deseni:
+// (a+)+ veya (x*)* gibi üstel süreye yol açan desenleri derleme anında reddeder.
+const REDOS_NESTED_QUANTIFIER = /\([^()]*[+*][^()]*\)[+*]/;
+
+function assertRegexIsSafe(source: string, ruleId: string): void {
+  if (REDOS_NESTED_QUANTIFIER.test(source)) {
+    throw new Error(
+      `Custom rule "${ruleId}" rejected: Regex contains dangerous nested quantifiers (e.g., (a+)+) susceptible to catastrophic backtracking (ReDoS). Simplify the pattern.`
+    );
+  }
+}
+
 export function compileCustomRule(def: CustomRuleDefinition): DetectionRule {
   let pattern: RegExp;
   try {
     const slashMatch = def.regex.match(/^\/(.+)\/([a-z]*)$/i);
     if (slashMatch && slashMatch[1]) {
+      assertRegexIsSafe(slashMatch[1], def.id);
       const flags = slashMatch[2]?.includes("g") ? slashMatch[2] : (slashMatch[2] || "") + "g";
       pattern = new RegExp(slashMatch[1], flags);
     } else {
+      assertRegexIsSafe(def.regex, def.id);
       pattern = new RegExp(def.regex, "g");
     }
   } catch (err: any) {
