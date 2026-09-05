@@ -385,10 +385,18 @@ npm pack --dry-run
 
 ## Roadmap
 
-The following capabilities are planned for upcoming releases:
+### Completed in v1.2.0
 
-- [ ] Configurable maximum file size limits via CLI and `.gitleak-radar.json`
-- [ ] Custom user-defined regex rules in configuration
+- [x] Custom user-defined regex and entropy rules via `.gitleak-radar.json` and `--rules`
+- [x] CLI configuration bootstrapping (`gitleak-radar init`)
+- [x] History streaming memory guard (10MB per-file boundary)
+
+### Planned for Upcoming Releases (v1.3.0+)
+
+- [ ] Configurable maximum file size limit via CLI (`--max-file-size`) and configuration
+- [ ] Rule explainer command (`gitleak-radar explain <rule-id>`)
+- [ ] Automated benchmark suite comparing throughput and false-positive rates against Gitleaks and TruffleHog
+- [ ] GitLab CI and Bitbucket Pipelines template recipes
 
 ## License
 
