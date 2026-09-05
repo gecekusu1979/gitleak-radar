@@ -1,4 +1,4 @@
-# GitLeak Radar ğŸ›¡ï¸
+# GitLeak Radar
 
 [![CI](https://github.com/gecekusu1979/gitleak-radar/actions/workflows/ci.yml/badge.svg)](https://github.com/gecekusu1979/gitleak-radar/actions)
 [![Tests](https://img.shields.io/badge/tests-70%2F70%20passing-brightgreen.svg)]()
@@ -10,7 +10,7 @@
 
 > **Static credential scanner and automated Git pre-commit hook designed to detect exposed API keys, access tokens, private keys, and database connection strings before code is committed or pushed.**
 
-GitLeak Radar runs locally across your codebase, directly against the staged Git index, or across Git commit history. It combines regex-based pattern matching, keyword pre-filtering, Shannon entropy checks for generic API keys, OASIS SARIF v2.1.0 reporting, and fail-closed workflow gates while preserving masked findings and a 0â€“100 repository security score.
+GitLeak Radar runs locally across your codebase, directly against the staged Git index, or across Git commit history. It combines regex-based pattern matching, keyword pre-filtering, Shannon entropy checks for generic API keys, OASIS SARIF v2.1.0 reporting, and fail-closed workflow gates while preserving masked findings and a 0-100 repository security score.
 
 GitLeak Radar is designed as a local-first SAST tool for detecting API keys, access tokens, private keys, database credentials, and other sensitive values before they enter commits or CI/CD workflows.
 
@@ -166,8 +166,8 @@ The pre-commit hook runs in **fail-closed mode**: if `gitleak-radar` or `npx` is
 git add .
 git commit -m "feat: add payment gateway credentials"
 
-# ğŸ•µï¸ GitLeak Radar: Scanning staged files...
-# âŒ Commit blocked: Sensitive credentials detected in staged changes.
+# GitLeak Radar: Scanning staged files...
+# Commit blocked: Sensitive credentials detected in staged changes.
 # Please unstage or mask secrets before committing.
 # Exit code 1.
 ```
@@ -286,26 +286,26 @@ GitLeak Radar follows POSIX exit conventions for standard shell and CI/CD integr
 
 ```text
 src/
-â”œâ”€â”€ cli/              # Commander CLI entrypoint, argument parsing, error routing
-â”œâ”€â”€ config/           # Zod schema validation and upward .gitleak-radar.json loader
-â”œâ”€â”€ detectors/        # Regex pattern matching rules, keyword pre-filtering, and detector logic
-â”œâ”€â”€ git/              # Git root resolution, index blob reader, staged diff, and history scanning
-â”œâ”€â”€ hooks/            # Idempotent fail-closed Git pre-commit hook installer
-â”œâ”€â”€ reporters/        # Chalk terminal, JSON, and SARIF report formatters
-â”œâ”€â”€ scanner/          # File filtering, symlink guards, 10MB size guard, and orchestrator pipeline
-â”œâ”€â”€ scoring/          # 0-100 normalized security score algorithm
-â””â”€â”€ types/            # TypeScript interfaces (Finding, ScanResult, ScanOptions)
+|-- cli/              # Commander CLI entrypoint, argument parsing, error routing
+|-- config/           # Zod schema validation and upward .gitleak-radar.json loader
+|-- detectors/        # Regex pattern matching rules, keyword pre-filtering, and detector logic
+|-- git/              # Git root resolution, index blob reader, staged diff, and history scanning
+|-- hooks/            # Idempotent fail-closed Git pre-commit hook installer
+|-- reporters/        # Chalk terminal, JSON, and SARIF report formatters
+|-- scanner/          # File filtering, symlink guards, 10MB size guard, and orchestrator pipeline
+|-- scoring/          # 0-100 normalized security score algorithm
+`-- types/            # TypeScript interfaces (Finding, ScanResult, ScanOptions)
 
 tests/
-â”œâ”€â”€ cli/              # CLI integration and argument tests
-â”œâ”€â”€ config/           # Zod validation and upward traversal tests
-â”œâ”€â”€ detectors/        # Pattern detection, pre-filter, and false-positive filter tests
-â”œâ”€â”€ git/              # Git root resolution, staged diff, index isolation, and history tests
-â”œâ”€â”€ hooks/            # Pre-commit hook installer and fail-closed posture tests
-â”œâ”€â”€ reporters/        # SARIF v2.1.0 reporter tests
-â”œâ”€â”€ scanner/          # File exclusion, binary, and 10MB limit tests
-â”œâ”€â”€ scoring/          # Security score calculation tests
-â””â”€â”€ security/         # ReDoS, path traversal, and symlink hardening tests
+|-- cli/              # CLI integration and argument tests
+|-- config/           # Zod validation and upward traversal tests
+|-- detectors/        # Pattern detection, pre-filter, and false-positive filter tests
+|-- git/              # Git root resolution, staged diff, index isolation, and history tests
+|-- hooks/            # Pre-commit hook installer and fail-closed posture tests
+|-- reporters/        # SARIF v2.1.0 reporter tests
+|-- scanner/          # File exclusion, binary, and 10MB limit tests
+|-- scoring/          # Security score calculation tests
+`-- security/         # ReDoS, path traversal, and symlink hardening tests
 ```
 
 ## Development & Testing
