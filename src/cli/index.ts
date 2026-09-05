@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+﻿#!/usr/bin/env node
 import { Command } from "commander";
 import chalk from "chalk";
 import ora from "ora";
@@ -41,6 +41,7 @@ program
   .argument("[path]", "Target directory path to scan", ".")
   .option("-s, --severity <level>", "Minimum severity threshold (low, medium, high, critical)", "low")
   .option("-i, --ignore <dirs...>", "Additional directories to ignore")
+  .option("-r, --rules <file>", "Path to custom rules JSON file")
   .option("-v, --verbose", "Show verbose scanning and file filter details")
   .option("--staged", "Scan only staged files in Git index")
   .option("--history", "Scan full Git commit history diffs for leaked secrets")
@@ -52,6 +53,7 @@ program
       options: {
         severity: string;
         ignore?: string[];
+        rules?: string;
         verbose?: boolean;
         staged?: boolean;
         history?: boolean;
@@ -82,6 +84,7 @@ program
           severity: options.severity as Severity,
           json: options.json,
           ignore: options.ignore,
+          rulesPath: options.rules,
           verbose: options.verbose,
           staged: options.staged,
           history: options.history,
@@ -117,10 +120,40 @@ program
   );
 
 program
+  .command("init")
+  .description("Create a default .gitleak-radar.json configuration file")
+  .argument("[path]", "Directory where configuration will be created", ".")
+  .action(async (targetDir: string) => {
+    const configPath = path.resolve(process.cwd(), targetDir, ".gitleak-radar.json");
+    if (fs.existsSync(configPath)) {
+      console.log(chalk.yellow(`⚠ Configuration already exists at ${configPath}`));
+      process.exit(0);
+    }
+
+    const template = {
+      ignore: ["tests", "dist", "node_modules"],
+      rules: {},
+      customRules: [
+        {
+          id: "corp-api-key",
+          name: "Corporate Internal API Key",
+          description: "Detects internal ACME API credentials",
+          severity: "high",
+          regex: "ACME_[A-Za-z0-9]{32}",
+          keywords: ["ACME_"]
+        }
+      ]
+    };
+
+    fs.writeFileSync(configPath, JSON.stringify(template, null, 2) + "\n", "utf-8");
+    console.log(chalk.green(`✓ Initialized default GitLeak Radar configuration at ${configPath}`));
+  });
+
+program
   .command("rules")
   .description("List all built-in credential detection rules")
   .action(() => {
-    console.log(chalk.bold("\nActive Detection Rules:\n"));
+    console.log(chalk.bold("\nActive Built-in Detection Rules:\n"));
     console.table(
       DETECTION_RULES.map((r) => ({
         ID: r.id,

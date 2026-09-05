@@ -1,4 +1,4 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 
 export type Severity = "low" | "medium" | "high" | "critical";
 
@@ -22,6 +22,19 @@ export const DetectionRuleSchema = z.object({
 
 export type DetectionRule = z.infer<typeof DetectionRuleSchema>;
 
+export const CustomRuleSchema = z.object({
+  id: z.string().min(1, "Rule ID cannot be empty"),
+  name: z.string().min(1, "Rule Name cannot be empty"),
+  description: z.string().default("Custom user-defined detection rule"),
+  severity: z.enum(["low", "medium", "high", "critical"]).default("high"),
+  regex: z.string().min(1, "Regex cannot be empty"),
+  keywords: z.array(z.string()).optional(),
+  minEntropy: z.number().optional(),
+  requiresEntropy: z.boolean().optional()
+});
+
+export type CustomRuleDefinition = z.infer<typeof CustomRuleSchema>;
+
 export interface Finding {
   ruleId: string;
   ruleName: string;
@@ -44,6 +57,7 @@ export interface ScanOptions {
   staged?: boolean;
   history?: boolean;
   maxCommits?: number;
+  rulesPath?: string;
   onFileAction?: (filePath: string, status: "scanned" | "ignored" | "binary") => void;
 }
 

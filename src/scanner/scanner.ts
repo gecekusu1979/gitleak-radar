@@ -1,12 +1,11 @@
-import fg from "fast-glob";
+﻿import fg from "fast-glob";
 import path from "node:path";
-import { type Finding, type ScanOptions, type ScanResult } from "../types/index.js";
+import { type Finding, type ScanOptions, type ScanResult, type DetectionRule } from "../types/index.js";
 import { SecretDetector } from "../detectors/detector.js";
-import { DETECTION_RULES } from "../detectors/rules.js";
 import { EXCLUDED_DIRECTORIES, shouldIgnorePath } from "./file-filter.js";
 import { readFileLines, type FileContent } from "./file-reader.js";
 import { calculateSecurityScore } from "../scoring/scorer.js";
-import { loadConfig } from "../config/loader.js";
+import { loadConfig, getEffectiveRules, loadExternalRulesFile } from "../config/loader.js";
 import { getStagedFiles, isInsideGitRepo, getGitRoot, readStagedFileLines } from "../git/staged.js";
 import { scanGitHistory } from "../git/history.js";
 
@@ -16,7 +15,13 @@ export class ProjectScanner {
     const targetDir = path.resolve(process.cwd(), options.path);
 
     const config = await loadConfig(targetDir);
-    const activeRules = DETECTION_RULES.filter((rule) => config.rules[rule.id] !== false);
+
+    let extraRules: DetectionRule[] = [];
+    if (options.rulesPath) {
+      extraRules = await loadExternalRulesFile(options.rulesPath);
+    }
+
+    const activeRules = getEffectiveRules(config, extraRules);
     const detector = new SecretDetector(activeRules);
 
     // 1. Mod: Git History Scanning (--history)
