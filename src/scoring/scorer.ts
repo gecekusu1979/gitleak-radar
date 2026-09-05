@@ -1,4 +1,4 @@
-﻿import { Finding, ScoreReport, ScoreTier, Severity } from "../types/index.js";
+import { Finding, ScoreReport, ScoreTier, Severity } from "../types/index.js";
 
 const PENALTIES: Record<Severity, number> = {
   critical: 35,

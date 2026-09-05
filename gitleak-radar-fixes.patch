@@ -1,0 +1,249 @@
+diff --git a/.gitleak-radar.json b/.gitleak-radar.json
+index 3a3a5b3..663c95d 100644
+--- a/.gitleak-radar.json
++++ b/.gitleak-radar.json
+@@ -1,7 +1,9 @@
+ {
+   "ignore": [
+     "tests",
+-    "dist"
++    "dist",
++    "src/detectors/rules.ts",
++    "src/detectors/detector.ts"
+   ],
+   "rules": {}
+ }
+\ No newline at end of file
+diff --git a/package.json b/package.json
+index 5bf7cf5..2144035 100644
+--- a/package.json
++++ b/package.json
+@@ -39,7 +39,7 @@
+     "test": "vitest run",
+     "test:watch": "vitest",
+     "clean": "node -e \"try{fs.rmSync('dist',{recursive:true,force:true})}catch(e){}\"",
+-    "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build"
++    "prepublishOnly": "pnpm typecheck && pnpm build && pnpm test"
+   },
+   "dependencies": {
+     "chalk": "^5.3.0",
+diff --git a/src/cli/index.ts b/src/cli/index.ts
+index 7e78331..132d1e1 100644
+--- a/src/cli/index.ts
++++ b/src/cli/index.ts
+@@ -1,4 +1,4 @@
+-﻿#!/usr/bin/env node
++#!/usr/bin/env node
+ import { Command } from "commander";
+ import chalk from "chalk";
+ import ora from "ora";
+diff --git a/src/detectors/detector.ts b/src/detectors/detector.ts
+index d6c8b75..d29f99a 100644
+--- a/src/detectors/detector.ts
++++ b/src/detectors/detector.ts
+@@ -1,4 +1,4 @@
+-﻿import { type DetectionRule, type Finding, type Severity, SeverityOrder } from "../types/index.js";
++import { type DetectionRule, type Finding, type Severity, SeverityOrder } from "../types/index.js";
+ import { isPlaceholderOrExample } from "../scanner/file-filter.js";
+ import { calculateShannonEntropy, isHighEntropyToken } from "./entropy.js";
+ 
+diff --git a/src/detectors/entropy.ts b/src/detectors/entropy.ts
+index 4f5379a..8030dda 100644
+--- a/src/detectors/entropy.ts
++++ b/src/detectors/entropy.ts
+@@ -1,4 +1,4 @@
+-﻿/**
++/**
+  * Verilen metnin Shannon entropisini hesaplar (bit cinsinden).
+  */
+ export function calculateShannonEntropy(data: string): number {
+diff --git a/src/detectors/rules.ts b/src/detectors/rules.ts
+index c8dec59..2476fc2 100644
+--- a/src/detectors/rules.ts
++++ b/src/detectors/rules.ts
+@@ -1,4 +1,4 @@
+-﻿import { DetectionRule } from "../types/index.js";
++import { DetectionRule } from "../types/index.js";
+ 
+ export const DETECTION_RULES: DetectionRule[] = [
+   {
+@@ -94,7 +94,7 @@ export const DETECTION_RULES: DetectionRule[] = [
+     name: "Google API Key",
+     description: "Identifies Google Cloud and service API keys",
+     severity: "high",
+-    pattern: /\b(AIza[0-9A-Za-z\\-_]{35})\b/g,
++    pattern: /\b(AIza[0-9A-Za-z_-]{35})\b/g,
+     keywords: ["aiza"]
+   },
+   {
+diff --git a/src/git/history.ts b/src/git/history.ts
+index 42f8ce4..a4bc5e0 100644
+--- a/src/git/history.ts
++++ b/src/git/history.ts
+@@ -1,4 +1,4 @@
+-﻿import { spawn } from "node:child_process";
++import { spawn } from "node:child_process";
+ import * as readline from "node:readline";
+ import { SecretDetector } from "../detectors/detector.js";
+ import { Finding, Severity } from "../types/index.js";
+diff --git a/src/git/staged.ts b/src/git/staged.ts
+index 8a9838e..19d367a 100644
+--- a/src/git/staged.ts
++++ b/src/git/staged.ts
+@@ -1,4 +1,4 @@
+-﻿import { execFile } from "node:child_process";
++import { execFile } from "node:child_process";
+ import { promisify } from "node:util";
+ import path from "node:path";
+ import fs from "node:fs/promises";
+diff --git a/src/hooks/installer.ts b/src/hooks/installer.ts
+index 804a146..23fff26 100644
+--- a/src/hooks/installer.ts
++++ b/src/hooks/installer.ts
+@@ -1,4 +1,4 @@
+-﻿import fs from "node:fs/promises";
++import fs from "node:fs/promises";
+ import path from "node:path";
+ 
+ export async function installPreCommitHook(
+diff --git a/src/reporters/sarif.ts b/src/reporters/sarif.ts
+index 678dece..2a075ba 100644
+--- a/src/reporters/sarif.ts
++++ b/src/reporters/sarif.ts
+@@ -1,4 +1,4 @@
+-﻿import fs from "node:fs";
++import fs from "node:fs";
+ import path from "node:path";
+ import chalk from "chalk";
+ import { type Finding, type ScanResult, type Severity } from "../types/index.js";
+diff --git a/src/scanner/file-filter.ts b/src/scanner/file-filter.ts
+index 00520d4..c0b04bd 100644
+--- a/src/scanner/file-filter.ts
++++ b/src/scanner/file-filter.ts
+@@ -1,4 +1,4 @@
+-﻿import path from "node:path";
++import path from "node:path";
+ 
+ export const EXCLUDED_DIRECTORIES = [
+   "**/node_modules/**",
+@@ -53,16 +53,6 @@ export function shouldIgnoreFile(filePath: string): boolean {
+   const ext = path.extname(filePath).toLowerCase();
+   const basename = path.basename(filePath);
+ 
+-  // Only ignore gitleak-radar's internal detector rule and engine definitions
+-  if (
+-    normalizedPath === "src/detectors/rules.ts" ||
+-    normalizedPath.endsWith("/src/detectors/rules.ts") ||
+-    normalizedPath === "src/detectors/detector.ts" ||
+-    normalizedPath.endsWith("/src/detectors/detector.ts")
+-  ) {
+-    return true;
+-  }
+-
+   if (EXCLUDED_EXTENSIONS.has(ext)) return true;
+   if (EXCLUDED_FILENAMES.has(basename)) return true;
+   if (basename.endsWith(".min.js") || basename.endsWith(".min.css")) return true;
+@@ -70,6 +60,10 @@ export function shouldIgnoreFile(filePath: string): boolean {
+   return false;
+ }
+ 
++const KNOWN_CANONICAL_PLACEHOLDERS = new Set([
++  "akiaiosfodnn7example" // AWS'in resmi dokümantasyonunda kullandığı örnek Access Key ID
++]);
++
+ export function isPlaceholderOrExample(
+   extractedValue: string,
+   lineContext: string,
+@@ -77,15 +71,26 @@ export function isPlaceholderOrExample(
+ ): boolean {
+   const normalizedValue = extractedValue.toLowerCase();
+   const normalizedLine = lineContext.toLowerCase();
++
++  if (KNOWN_CANONICAL_PLACEHOLDERS.has(normalizedValue)) {
++    return true;
++  }
++
+   const normalizedPath = filePath ? filePath.toLowerCase().replace(/\\/g, "/") : "";
++  const pathSegments = normalizedPath.split("/");
++  const pathBasename = pathSegments[pathSegments.length - 1] || "";
++  const TEST_OR_DOC_SEGMENTS = new Set([
++    "test", "tests", "__tests__",
++    "fixture", "fixtures",
++    "mock", "mocks", "__mocks__",
++    "example", "examples"
++  ]);
+ 
+   const isTestOrDoc =
+-    normalizedPath.includes("test") ||
+-    normalizedPath.includes("fixture") ||
+-    normalizedPath.includes("mock") ||
+-    normalizedPath.includes("example") ||
+     normalizedPath.endsWith(".md") ||
+-    normalizedPath.endsWith(".mdx");
++    normalizedPath.endsWith(".mdx") ||
++    pathSegments.some((segment) => TEST_OR_DOC_SEGMENTS.has(segment)) ||
++    /\.(test|spec|fixture|mock)\.[^./]+$/.test(pathBasename);
+ 
+   if (isTestOrDoc) {
+     if (PLACEHOLDERS.some((p) => normalizedValue.includes(p))) {
+@@ -102,7 +107,7 @@ export function isPlaceholderOrExample(
+   }
+ 
+   const uniqueChars = new Set(extractedValue.split(""));
+-  if (uniqueChars.size <= 2 && extractedValue.length > 6) {
++  if (isTestOrDoc && uniqueChars.size <= 2 && extractedValue.length > 6) {
+     return true;
+   }
+ 
+@@ -136,8 +141,9 @@ export function shouldIgnorePath(filePath: string, customIgnores: string[] = [])
+ 
+     if (
+       normalized === clean ||
+-      normalized.includes(clean) ||
+-      normalized.endsWith(`/${clean}`)
++      normalized.startsWith(`${clean}/`) ||
++      normalized.endsWith(`/${clean}`) ||
++      normalized.includes(`/${clean}/`)
+     ) {
+       return true;
+     }
+diff --git a/src/scanner/file-reader.ts b/src/scanner/file-reader.ts
+index c0f146e..cb84a83 100644
+--- a/src/scanner/file-reader.ts
++++ b/src/scanner/file-reader.ts
+@@ -1,4 +1,4 @@
+-﻿import fs from "node:fs/promises";
++import fs from "node:fs/promises";
+ import fsSync from "node:fs";
+ 
+ export const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+diff --git a/src/scanner/scanner.ts b/src/scanner/scanner.ts
+index 42988f4..17c1d65 100644
+--- a/src/scanner/scanner.ts
++++ b/src/scanner/scanner.ts
+@@ -1,4 +1,4 @@
+-﻿import fg from "fast-glob";
++import fg from "fast-glob";
+ import path from "node:path";
+ import { type Finding, type ScanOptions, type ScanResult } from "../types/index.js";
+ import { SecretDetector } from "../detectors/detector.js";
+diff --git a/src/scoring/scorer.ts b/src/scoring/scorer.ts
+index 20da60b..30c2b60 100644
+--- a/src/scoring/scorer.ts
++++ b/src/scoring/scorer.ts
+@@ -1,4 +1,4 @@
+-﻿import { Finding, ScoreReport, ScoreTier, Severity } from "../types/index.js";
++import { Finding, ScoreReport, ScoreTier, Severity } from "../types/index.js";
+ 
+ const PENALTIES: Record<Severity, number> = {
+   critical: 35,
+diff --git a/src/types/index.ts b/src/types/index.ts
+index a683640..a19a7d7 100644
+--- a/src/types/index.ts
++++ b/src/types/index.ts
+@@ -1,4 +1,4 @@
+-﻿import { z } from "zod";
++import { z } from "zod";
+ 
+ export type Severity = "low" | "medium" | "high" | "critical";
+ 

@@ -12,11 +12,8 @@ export interface HistoryScanResult {
 }
 
 const COMMIT_START_MARKER = "__GITLEAK_COMMIT_START__";
+const MAX_DIFF_BYTES_PER_FILE = 10 * 1024 * 1024; // 10 MB sınırı
 
-/**
- * Git commit geçmişini streaming yöntemiyle, harici komut çalıştırma (diff injection) 
- * risklerine karşı korumalı ve bellek tüketmeden satır satır tarar.
- */
 export async function scanGitHistory(
   repoPath: string,
   detector: SecretDetector,
@@ -26,9 +23,6 @@ export async function scanGitHistory(
   onProgress?: (filePath: string, status: "scanned" | "ignored" | "binary") => void
 ): Promise<HistoryScanResult> {
   return new Promise((resolve, reject) => {
-    // 1. Güvenlik Bariyerleri:
-    // -c diff.external= ve --no-ext-diff ile zararlı harici diff komutları engellenir.
-    // Null-byte (%x00) ile güvenli meta veri serileştirmesi yapılır.
     const gitArgs = [
       "-c",
       "diff.external=",
@@ -42,10 +36,9 @@ export async function scanGitHistory(
     ];
 
     if (typeof maxCommits === "number" && maxCommits > 0) {
-      gitArgs.push(`-n`, String(maxCommits));
+      gitArgs.push("-n", String(maxCommits));
     }
 
-    // Argument injection bariyeri
     gitArgs.push("--");
 
     const child = spawn("git", gitArgs, {
@@ -70,9 +63,9 @@ export async function scanGitHistory(
     let currentLineNumber = 0;
     let totalLinesScanned = 0;
     let isFileIgnored = false;
+    let currentFileDiffBytes = 0;
 
     rl.on("line", (line: string) => {
-      // Commit Başlangıcı ve Metadata
       if (line.startsWith(COMMIT_START_MARKER)) {
         const parts = line.split("\0");
         if (parts.length >= 4) {
@@ -85,22 +78,21 @@ export async function scanGitHistory(
         }
         currentFile = "";
         isFileIgnored = false;
+        currentFileDiffBytes = 0;
         return;
       }
 
-      // Dosya Değişikliği Başlığı (+++ b/...)
       if (line.startsWith("+++ ")) {
         let rawPath = line.slice(4).trim();
-        // Git tırnaklı yolları temizle: "b/path with spaces" -> b/path with spaces
         if (rawPath.startsWith('"') && rawPath.endsWith('"')) {
           rawPath = rawPath.slice(1, -1);
         }
-        // Prefix temizle (b/...)
         if (rawPath.startsWith("b/")) {
           rawPath = rawPath.slice(2);
         }
 
         currentFile = rawPath;
+        currentFileDiffBytes = 0;
 
         if (currentFile === "/dev/null" || !currentFile) {
           isFileIgnored = true;
@@ -117,18 +109,15 @@ export async function scanGitHistory(
         return;
       }
 
-      // Dosya yoksayılmış veya silinmişse diff içeriğini atla
       if (isFileIgnored || !currentFile) {
         return;
       }
 
-      // İkili Dosya Uyarısı
       if (line.startsWith("Binary files ") && line.endsWith("differ")) {
         onProgress?.(currentFile, "binary");
         return;
       }
 
-      // Hunk Başlığı: @@ -old,count +newStart,count @@ [opsiyonel fonksiyon başlığı]
       if (line.startsWith("@@ ")) {
         const match = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
         if (match && match[1]) {
@@ -137,9 +126,14 @@ export async function scanGitHistory(
         return;
       }
 
-      // Diff İçinde Eklenen Satırlar (+) - Dosya başlığı ('+++') hariç
       if (line.startsWith("+") && !line.startsWith("+++")) {
         const addedContent = line.slice(1);
+        currentFileDiffBytes += Buffer.byteLength(addedContent, "utf8");
+
+        if (currentFileDiffBytes > MAX_DIFF_BYTES_PER_FILE) {
+          return;
+        }
+
         totalLinesScanned++;
 
         const lineFindings = detector.scanLine(
@@ -172,7 +166,6 @@ export async function scanGitHistory(
     });
 
     child.on("close", (code) => {
-      // Git commit olmayan temiz/yeni init edilmiş repo durumları
       if (
         code !== 0 &&
         (stderr.includes("does not have any commits yet") ||

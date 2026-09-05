@@ -1,4 +1,4 @@
-﻿import fs from "node:fs";
+import fs from "node:fs";
 import path from "node:path";
 import chalk from "chalk";
 import { type Finding, type ScanResult, type Severity } from "../types/index.js";

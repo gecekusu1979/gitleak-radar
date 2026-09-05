@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Verilen metnin Shannon entropisini hesaplar (bit cinsinden).
  */
 export function calculateShannonEntropy(data: string): number {

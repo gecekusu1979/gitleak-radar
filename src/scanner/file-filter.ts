@@ -1,4 +1,4 @@
-﻿import path from "node:path";
+import path from "node:path";
 
 export const EXCLUDED_DIRECTORIES = [
   "**/node_modules/**",
@@ -53,22 +53,16 @@ export function shouldIgnoreFile(filePath: string): boolean {
   const ext = path.extname(filePath).toLowerCase();
   const basename = path.basename(filePath);
 
-  // Only ignore gitleak-radar's internal detector rule and engine definitions
-  if (
-    normalizedPath === "src/detectors/rules.ts" ||
-    normalizedPath.endsWith("/src/detectors/rules.ts") ||
-    normalizedPath === "src/detectors/detector.ts" ||
-    normalizedPath.endsWith("/src/detectors/detector.ts")
-  ) {
-    return true;
-  }
-
   if (EXCLUDED_EXTENSIONS.has(ext)) return true;
   if (EXCLUDED_FILENAMES.has(basename)) return true;
   if (basename.endsWith(".min.js") || basename.endsWith(".min.css")) return true;
 
   return false;
 }
+
+const KNOWN_CANONICAL_PLACEHOLDERS = new Set([
+  "akiaiosfodnn7example" // AWS'in resmi dokümantasyonunda kullandığı örnek Access Key ID
+]);
 
 export function isPlaceholderOrExample(
   extractedValue: string,
@@ -77,15 +71,26 @@ export function isPlaceholderOrExample(
 ): boolean {
   const normalizedValue = extractedValue.toLowerCase();
   const normalizedLine = lineContext.toLowerCase();
+
+  if (KNOWN_CANONICAL_PLACEHOLDERS.has(normalizedValue)) {
+    return true;
+  }
+
   const normalizedPath = filePath ? filePath.toLowerCase().replace(/\\/g, "/") : "";
+  const pathSegments = normalizedPath.split("/");
+  const pathBasename = pathSegments[pathSegments.length - 1] || "";
+  const TEST_OR_DOC_SEGMENTS = new Set([
+    "test", "tests", "__tests__",
+    "fixture", "fixtures",
+    "mock", "mocks", "__mocks__",
+    "example", "examples"
+  ]);
 
   const isTestOrDoc =
-    normalizedPath.includes("test") ||
-    normalizedPath.includes("fixture") ||
-    normalizedPath.includes("mock") ||
-    normalizedPath.includes("example") ||
     normalizedPath.endsWith(".md") ||
-    normalizedPath.endsWith(".mdx");
+    normalizedPath.endsWith(".mdx") ||
+    pathSegments.some((segment) => TEST_OR_DOC_SEGMENTS.has(segment)) ||
+    /\.(test|spec|fixture|mock)\.[^./]+$/.test(pathBasename);
 
   if (isTestOrDoc) {
     if (PLACEHOLDERS.some((p) => normalizedValue.includes(p))) {
@@ -102,7 +107,7 @@ export function isPlaceholderOrExample(
   }
 
   const uniqueChars = new Set(extractedValue.split(""));
-  if (uniqueChars.size <= 2 && extractedValue.length > 6) {
+  if (isTestOrDoc && uniqueChars.size <= 2 && extractedValue.length > 6) {
     return true;
   }
 
@@ -136,8 +141,9 @@ export function shouldIgnorePath(filePath: string, customIgnores: string[] = [])
 
     if (
       normalized === clean ||
-      normalized.includes(clean) ||
-      normalized.endsWith(`/${clean}`)
+      normalized.startsWith(`${clean}/`) ||
+      normalized.endsWith(`/${clean}`) ||
+      normalized.includes(`/${clean}/`)
     ) {
       return true;
     }

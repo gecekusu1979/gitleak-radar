@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env node
+#!/usr/bin/env node
 import { Command } from "commander";
 import chalk from "chalk";
 import ora from "ora";

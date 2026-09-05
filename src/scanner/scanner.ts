@@ -1,4 +1,4 @@
-﻿import fg from "fast-glob";
+import fg from "fast-glob";
 import path from "node:path";
 import { type Finding, type ScanOptions, type ScanResult } from "../types/index.js";
 import { SecretDetector } from "../detectors/detector.js";

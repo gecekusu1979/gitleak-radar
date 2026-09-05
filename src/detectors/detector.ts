@@ -1,6 +1,6 @@
-﻿import { type DetectionRule, type Finding, type Severity, SeverityOrder } from "../types/index.js";
+import { type DetectionRule, type Finding, type Severity, SeverityOrder } from "../types/index.js";
 import { isPlaceholderOrExample } from "../scanner/file-filter.js";
-import { calculateShannonEntropy, isHighEntropyToken } from "./entropy.js";
+import { calculateShannonEntropy } from "./entropy.js";
 
 export const MAX_LINE_LENGTH = 8192;
 

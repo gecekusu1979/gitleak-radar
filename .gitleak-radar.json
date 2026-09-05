@@ -1,7 +1,9 @@
 {
   "ignore": [
     "tests",
-    "dist"
+    "dist",
+    "src/detectors/rules.ts",
+    "src/detectors/detector.ts"
   ],
   "rules": {}
 }

@@ -1,4 +1,4 @@
-﻿import { DetectionRule } from "../types/index.js";
+import { DetectionRule } from "../types/index.js";
 
 export const DETECTION_RULES: DetectionRule[] = [
   {
@@ -94,7 +94,7 @@ export const DETECTION_RULES: DetectionRule[] = [
     name: "Google API Key",
     description: "Identifies Google Cloud and service API keys",
     severity: "high",
-    pattern: /\b(AIza[0-9A-Za-z\\-_]{35})\b/g,
+    pattern: /\b(AIza[0-9A-Za-z_-]{35})\b/g,
     keywords: ["aiza"]
   },
   {
