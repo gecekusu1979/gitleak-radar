@@ -4,7 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/gitleak-radar.svg)](https://www.npmjs.com/package/gitleak-radar)
 
 [![CI](https://github.com/gecekusu1979/gitleak-radar/actions/workflows/ci.yml/badge.svg)](https://github.com/gecekusu1979/gitleak-radar/actions)
-[![Tests](https://img.shields.io/badge/tests-70%2F70%20passing-brightgreen.svg)]()
+[![tests](https://img.shields.io/badge/tests-74%2F74%20passing-brightgreen)](https://github.com/gecekusu1979/gitleak-radar)
 [![SARIF](https://img.shields.io/badge/SARIF-v2.1.0%20Compliant-blue.svg)]()
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict%20Mode-3178c6.svg)](https://www.typescriptlang.org/)
@@ -121,6 +121,13 @@ npx gitleak-radar scan .
 
 ### Basic Scans
 
+Initialize default configuration:
+
+```bash
+# Initialize default configuration
+npx gitleak-radar init
+```
+
 Scan the entire current directory:
 
 ```bash
@@ -189,10 +196,15 @@ Options:
 Commands:
   scan [options] [path]              Scan files or staged Git changes for secrets
   rules                              List all built-in credential detection rules
+  init [path]                        Initialize a default .gitleak-radar.json configuration file
   install-hook [options] [path]      Install GitLeak Radar as a Git pre-commit hook
 ```
 
 ### Scan Command Options
+
+| Option | Description | Default |
+| --- | --- | --- |
+| `-r, --rules <file>` | Path to external custom rules JSON file | - |
 
 ```bash
 # Scan with specific severity threshold (low, medium, high, critical)
@@ -253,6 +265,33 @@ To configure path exclusions or toggle specific rules, add an optional `.gitleak
     "generic-api-key": false
   }
 }
+```
+
+### Custom Rules
+
+You can define proprietary corporate rules in `.gitleak-radar.json`:
+
+```json
+{
+  "ignore": ["tests", "dist"],
+  "customRules": [
+    {
+      "id": "corp-api-key",
+      "name": "Corporate API Key",
+      "description": "Detects internal secret keys",
+      "severity": "high",
+      "regex": "ACME_[A-Za-z0-9]{32}",
+      "keywords": ["ACME_"],
+      "minEntropy": 3.2
+    }
+  ]
+}
+```
+
+Or pass external custom rules on the fly via CLI:
+
+```bash
+npx gitleak-radar scan --rules ./company-rules.json
 ```
 
 ### Monorepo & Upward Traversal
