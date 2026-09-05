@@ -34,7 +34,7 @@ GitLeak Radar is designed as a local-first SAST tool for detecting API keys, acc
 - **Default Test Directory Coverage:** `tests/` and `test/` directories are scanned by default to prevent hardcoded credentials from leaking through test fixtures or mock environments.
 - **Unquoted `.env` Secret Detection:** Robust capture rules support both quoted and unquoted environment variable definitions (e.g., `API_KEY=sk_live_...`), preserving comments and boundary safety.
 - **Path-Aware Placeholder Filtering:** Distinct placeholder logic ensures real credentials containing words like `test` or `dummy` (e.g., `sk_test_...`) in production code are never filtered out, while documentation and fixtures retain test-token bypasses.
-- **Deduplicated Security Scoring:** Repeated secrets within the same file apply a single rule penalty, preventing skewed zero-scores across large codebases while preserving accurate finding counts.
+- **Coordinate-Based Security Scoring:** Deduplicates findings on the exact same physical coordinates (file, line, column) to the highest severity, while distinct secrets across different lines apply cumulative penalties for accurate risk assessment.
 - **Staged Git Scanning:** Scans changes directly in the Git staging index via `git diff --cached`, correctly resolving files across repository root and nested working directories.
 - **Pre-commit Automation with Severity Control:** Hook installer (`gitleak-radar install-hook -s <level>`) configures automated commit validation with explicit POSIX executable permissions and customizable threshold gating.
 - **Large File Protection:** Skips files larger than 10MB (`MAX_FILE_SIZE_BYTES`) before buffering into memory to prevent process exhaustion.
@@ -366,7 +366,7 @@ pnpm install
 # Run TypeScript typechecks
 pnpm typecheck
 
-# Run the Vitest test suite (70 automated tests)
+# Run the Vitest test suite (77 automated tests)
 pnpm test
 
 # Build the production bundle
