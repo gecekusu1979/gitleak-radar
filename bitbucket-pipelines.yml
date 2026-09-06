@@ -1,0 +1,25 @@
+﻿# Bitbucket Pipelines template for GitLeak Radar
+image: node:20
+
+pipelines:
+  default:
+    - step:
+        name: GitLeak Radar Secret Scan
+        caches:
+          - node
+        script:
+          - npm install -g gitleak-radar@^1.3.1
+          - gitleak-radar scan . --severity high --junit gitleak-report.xml
+        artifacts:
+          - gitleak-report.xml
+
+  pull-requests:
+    '**':
+      - step:
+          name: Incremental PR Scan
+          caches:
+            - node
+          script:
+            - npm install -g gitleak-radar@^1.3.1
+            - git fetch origin "$BITBUCKET_PR_DESTINATION_BRANCH"
+            - gitleak-radar scan . --since "origin/$BITBUCKET_PR_DESTINATION_BRANCH" --severity medium
