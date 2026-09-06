@@ -1,0 +1,129 @@
+﻿name: 'GitLeak Radar'
+description: 'Fast, local-first secret & credential scanner for source code, staged changes, and Git history.'
+author: 'gecekusu1979'
+
+branding:
+  icon: 'shield'
+  color: 'red'
+
+inputs:
+  path:
+    description: 'Directory to scan'
+    required: false
+    default: '.'
+  version:
+    description: 'Pinned gitleak-radar npm version. Bump this deliberately on each release for reproducible scans.'
+    required: false
+    default: '1.3.1'
+  severity:
+    description: 'Minimum severity threshold (low, medium, high, critical)'
+    required: false
+    default: 'low'
+  since:
+    description: 'Only scan files changed since this Git ref (e.g. origin/main). Leave empty for a full scan.'
+    required: false
+    default: ''
+  staged:
+    description: 'Scan only staged files in the Git index'
+    required: false
+    default: 'false'
+  history:
+    description: 'Scan the full Git commit history'
+    required: false
+    default: 'false'
+  baseline:
+    description: 'Path to a baseline file to suppress previously accepted findings'
+    required: false
+    default: ''
+  max-file-size:
+    description: 'Maximum file size to scan (e.g. 5MB)'
+    required: false
+    default: ''
+  rules:
+    description: 'Path to a custom rules JSON file'
+    required: false
+    default: ''
+  sarif-file:
+    description: 'Path to write the SARIF report'
+    required: false
+    default: 'gitleak-radar-results.sarif'
+  upload-sarif:
+    description: 'Automatically upload the SARIF report to the GitHub Security tab'
+    required: false
+    default: 'true'
+  fail-on-findings:
+    description: 'Fail this step when secrets are found (exit code 1)'
+    required: false
+    default: 'true'
+
+outputs:
+  findings-count:
+    description: 'Number of findings reported in the SARIF output'
+    value: ${{ steps.scan.outputs.findings-count }}
+  exit-code:
+    description: 'Raw gitleak-radar exit code (0=clean, 1=findings, 2=tool error)'
+    value: ${{ steps.scan.outputs.exit-code }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install GitLeak Radar
+      shell: bash
+      run: npm install -g "gitleak-radar@${{ inputs.version }}"
+
+    # NOT: --sarif ve --json ayni anda kullanilamaz (CLI'da cikti formatlari
+    # birbirini dislar, --sarif kazanir). Bulgu sayisini SARIF dosyasinin
+    # kendisinden (results dizisinin uzunlugu) cikariyoruz.
+    - name: Run GitLeak Radar
+      id: scan
+      shell: bash
+      run: |
+        set +e
+
+        ARGS=(scan "${{ inputs.path }}" --severity "${{ inputs.severity }}" --github-actions --sarif "${{ inputs.sarif-file }}")
+
+        if [ -n "${{ inputs.since }}" ]; then ARGS+=(--since "${{ inputs.since }}"); fi
+        if [ "${{ inputs.staged }}" = "true" ]; then ARGS+=(--staged); fi
+        if [ "${{ inputs.history }}" = "true" ]; then ARGS+=(--history); fi
+        if [ -n "${{ inputs.baseline }}" ]; then ARGS+=(--baseline "${{ inputs.baseline }}"); fi
+        if [ -n "${{ inputs.max-file-size }}" ]; then ARGS+=(--max-file-size "${{ inputs.max-file-size }}"); fi
+        if [ -n "${{ inputs.rules }}" ]; then ARGS+=(--rules "${{ inputs.rules }}"); fi
+
+        gitleak-radar "${ARGS[@]}"
+        EXIT_CODE=$?
+
+        set -e
+
+        FINDINGS=$(node -e "
+          try {
+            const d = JSON.parse(require('fs').readFileSync('${{ inputs.sarif-file }}', 'utf-8'));
+            console.log(d.runs?.[0]?.results?.length ?? 0);
+          } catch {
+            console.log(0);
+          }
+        ")
+
+        echo "findings-count=$FINDINGS" >> "$GITHUB_OUTPUT"
+        echo "exit-code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+
+        if [ "$EXIT_CODE" -eq 2 ]; then
+          echo "::error::GitLeak Radar encountered a tool error (exit code 2)."
+          exit 2
+        fi
+
+        if [ "$EXIT_CODE" -eq 1 ] && [ "${{ inputs.fail-on-findings }}" = "true" ]; then
+          exit 1
+        fi
+
+        exit 0
+
+    - name: Upload SARIF to GitHub Security tab
+      if: always() && inputs.upload-sarif == 'true'
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ inputs.sarif-file }}
