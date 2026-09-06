@@ -60,7 +60,7 @@ inputs:
     required: false
     default: 'false'
   github-token:
-    description: 'GitHub token for posting PR comments (e.g. ${{ secrets.GITHUB_TOKEN }})'
+    description: 'GitHub token for posting PR comments (e.g. secrets.GITHUB_TOKEN)'
     required: false
     default: ''
 
@@ -199,3 +199,5 @@ runs:
               body: body
             });
           }
+
+
