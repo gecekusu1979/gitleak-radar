@@ -1,4 +1,5 @@
-﻿import { type DetectionRule, type Finding, type Severity, SeverityOrder } from "../types/index.js";
+﻿import crypto from "node:crypto";
+import { type DetectionRule, type Finding, type Severity, SeverityOrder } from "../types/index.js";
 import { isPlaceholderOrExample } from "../scanner/file-filter.js";
 import { calculateShannonEntropy, isHighEntropyToken } from "./entropy.js";
 import { isLineIgnoredByDirective } from "./inline-ignore.js";
@@ -89,7 +90,8 @@ export class SecretDetector {
           file: filePath,
           line: lineNumber,
           column,
-          maskedValue: this.mask(rawSecret)
+          maskedValue: this.mask(rawSecret),
+          secretHash: crypto.createHash("sha256").update(rawSecret).digest("hex")
         });
 
         if (!rule.pattern.global) {

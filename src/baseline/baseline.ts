@@ -19,7 +19,8 @@ export interface BaselineFile {
 
 export function generateFingerprint(finding: Finding): string {
   const normalizedFile = finding.file.replace(/\\/g, "/");
-  const rawKey = `${normalizedFile}:${finding.ruleId}:${finding.maskedValue}`;
+    const secretIdentity = finding.secretHash ?? finding.maskedValue;
+  const rawKey = `${normalizedFile}:${finding.ruleId}:${secretIdentity}`;
   return crypto.createHash("sha256").update(rawKey).digest("hex");
 }
 

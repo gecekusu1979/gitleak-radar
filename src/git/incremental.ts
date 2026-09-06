@@ -16,7 +16,7 @@ export async function getChangedFilesSince(targetDir: string, ref: string): Prom
 
   let diffStdout = "";
   try {
-    const res = await execFileAsync("git", ["diff", "--name-only", "--diff-filter=d", ref, "--"], {
+    const res = await execFileAsync("git", ["diff", "--name-only", "--diff-filter=d", "--end-of-options", ref, "--"], {
       cwd: gitRoot
     });
     diffStdout = res.stdout;

@@ -19,7 +19,6 @@ describe("Incremental Scan (--since <ref>)", () => {
     await execFileAsync("git", ["config", "user.name", "Test Runner"], { cwd: tempRepo });
     await execFileAsync("git", ["config", "user.email", "test@example.com"], { cwd: tempRepo });
 
-    // 1. Temel Commit (clean code)
     await fs.writeFile(path.join(tempRepo, "existing.ts"), "export const a = 1;\n", "utf-8");
     await execFileAsync("git", ["add", "."], { cwd: tempRepo });
     await execFileAsync("git", ["commit", "-m", "Initial commit"], { cwd: tempRepo });
@@ -30,7 +29,6 @@ describe("Incremental Scan (--since <ref>)", () => {
   });
 
   it("identifies changed files since specified commit ref", async () => {
-    // 2. Yeni dosya ekle ve commit et
     await fs.writeFile(
       path.join(tempRepo, "new-secret.ts"),
       `const stripeKey = "${MOCK_STRIPE}";\n`,
@@ -45,7 +43,6 @@ describe("Incremental Scan (--since <ref>)", () => {
   });
 
   it("scans only modified files when --since is provided to scanner", async () => {
-    // Değişiklik yap: yeni dosyaya sızıntı ekle, eski dosya temiz kalsın
     await fs.writeFile(
       path.join(tempRepo, "modified.ts"),
       `const stripeKey = "${MOCK_STRIPE}";\n`,
@@ -71,5 +68,15 @@ describe("Incremental Scan (--since <ref>)", () => {
         since: "invalid-branch-ref-999"
       })
     ).rejects.toThrow("Failed to resolve git reference");
+  });
+
+  it("prevents flag/argument injection attacks when ref starts with dashes", async () => {
+    const maliciousFile = path.join(tempRepo, "pwned.txt");
+    const maliciousRef = `--output=${maliciousFile}`;
+
+    await expect(getChangedFilesSince(tempRepo, maliciousRef)).rejects.toThrow();
+
+    const fileExists = await fs.stat(maliciousFile).then(() => true).catch(() => false);
+    expect(fileExists).toBe(false);
   });
 });

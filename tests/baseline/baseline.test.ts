@@ -2,6 +2,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
+import crypto from "node:crypto";
 import { generateFingerprint, saveBaseline, loadBaselineFingerprints, filterFindingsByBaseline } from "../../src/baseline/baseline.js";
 import { type Finding } from "../../src/types/index.js";
 import { ProjectScanner } from "../../src/scanner/scanner.js";
@@ -64,21 +65,49 @@ describe("Baseline / Allowlist Engine", () => {
     expect(result.activeFindings[0]!.ruleId).toBe("aws-access-key");
   });
 
+  it("distinguishes between different secrets that share identical prefix and suffix", () => {
+    const secretA = "AKIA111111111111TEST";
+    const secretB = "AKIA999999999999TEST";
+
+    const findingA: Finding = {
+      ruleId: "aws-access-key",
+      ruleName: "AWS Access Key",
+      severity: "critical",
+      file: "config.ts",
+      line: 1,
+      column: 1,
+      maskedValue: "AKIA****************TEST",
+      secretHash: crypto.createHash("sha256").update(secretA).digest("hex")
+    };
+
+    const findingB: Finding = {
+      ...findingA,
+      secretHash: crypto.createHash("sha256").update(secretB).digest("hex")
+    };
+
+    const fpA = generateFingerprint(findingA);
+    const fpB = generateFingerprint(findingB);
+
+    expect(fpA).not.toBe(fpB);
+
+    const baselineSet = new Set([fpA]);
+    const result = filterFindingsByBaseline([findingB], baselineSet);
+    expect(result.activeFindings.length).toBe(1);
+    expect(result.suppressedCount).toBe(0);
+  });
+
   it("creates baseline file and ignores findings in subsequent scan via ProjectScanner", async () => {
     const secretFile = path.join(tempDir, "config.js");
     await fs.writeFile(secretFile, `const key = "${MOCK_STRIPE}";\n`, "utf-8");
 
     const scanner = new ProjectScanner();
 
-    // 1. İlk tarama bulguyu yakalar
     const initialResult = await scanner.scan({ path: tempDir });
     expect(initialResult.findings.length).toBe(1);
 
-    // 2. Baseline oluştur
     const baselineFile = path.join(tempDir, ".gitleak-radar-baseline.json");
     await scanner.scan({ path: tempDir, createBaseline: baselineFile });
 
-    // 3. Baseline varken tekrar tara -> Bulguyu susturmalı, skor 100 olmalı
     const afterBaselineResult = await scanner.scan({ path: tempDir, baselinePath: baselineFile });
     expect(afterBaselineResult.findings.length).toBe(0);
     expect(afterBaselineResult.summary.suppressedFindings).toBe(1);

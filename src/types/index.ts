@@ -43,6 +43,7 @@ export interface Finding {
   line: number;
   column: number;
   maskedValue: string;
+  secretHash?: string;
   commit?: string;
   commitAuthor?: string;
   commitDate?: string;
