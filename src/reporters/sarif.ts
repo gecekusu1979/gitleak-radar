@@ -1,4 +1,4 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import chalk from "chalk";
 import { type Finding, type ScanResult, type Severity } from "../types/index.js";
@@ -76,7 +76,11 @@ export function generateSarifReport(result: ScanResult, toolVersion = "1.0.0"): 
       message: {
         text: `Secret detected by rule '${f.ruleName}' (masked: ${f.maskedValue})`
       },
-      locations: [
+              partialFingerprints: f.secretHash ? {
+          secretHash: f.secretHash,
+          primaryLocationLineHash: f.secretHash
+        } : undefined,
+        locations: [
         {
           physicalLocation: {
             artifactLocation: {
