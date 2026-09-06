@@ -1,0 +1,16 @@
+﻿name: Update Major Tag
+on:
+  release:
+    types: [published]
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Move v1 Tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -fa v1 -m "Update v1 floating tag to ${{ github.ref_name }}"
+          git push origin v1 --force
