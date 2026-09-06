@@ -9,8 +9,12 @@ import { ProjectScanner } from "../scanner/scanner.js";
 import { renderTerminalReport } from "../reporters/terminal.js";
 import { renderJsonReport } from "../reporters/json.js";
 import { renderSarifReport } from "../reporters/sarif.js";
+import { renderGitHubActionsReport } from "../reporters/github-actions.js";
+import { renderJunitReport } from "../reporters/junit.js";
+import { renderGitLabReport } from "../reporters/gitlab.js";
 import { DETECTION_RULES } from "../detectors/rules.js";
 import { installPreCommitHook } from "../hooks/installer.js";
+import { explainRule } from "../commands/explain.js";
 import { Severity } from "../types/index.js";
 
 function getPackageVersion(): string {
@@ -42,11 +46,18 @@ program
   .option("-s, --severity <level>", "Minimum severity threshold (low, medium, high, critical)", "low")
   .option("-i, --ignore <dirs...>", "Additional directories to ignore")
   .option("-r, --rules <file>", "Path to custom rules JSON file")
+  .option("--max-file-size <size>", "Maximum file size limit to scan (e.g. 5MB, 500KB, 10485760)")
+  .option("--baseline <file>", "Path to baseline file to suppress known findings")
+  .option("--create-baseline [file]", "Generate a baseline file of current findings and exit")
   .option("-v, --verbose", "Show verbose scanning and file filter details")
   .option("--staged", "Scan only staged files in Git index")
   .option("--history", "Scan full Git commit history diffs for leaked secrets")
+  .option("--since <ref>", "Scan only files changed since specified Git commit, branch, or tag (e.g. origin/main, HEAD~1)")
   .option("--json", "Output results formatted as standard JSON")
   .option("--sarif [file]", "Output results in SARIF v2.1.0 format (to stdout or file)")
+  .option("--junit [file]", "Output results in JUnit XML format (to stdout or file)")
+  .option("--gitlab [file]", "Output results in GitLab Code Quality JSON format (to stdout or file)")
+  .option("--github-actions", "Emit GitHub Actions workflow annotations (::error/::warning)")
   .action(
     async (
       targetPath: string,
@@ -54,11 +65,18 @@ program
         severity: string;
         ignore?: string[];
         rules?: string;
+        maxFileSize?: string;
+        baseline?: string;
+        createBaseline?: boolean | string;
         verbose?: boolean;
         staged?: boolean;
         history?: boolean;
+        since?: string;
         json?: boolean;
         sarif?: string | boolean;
+        junit?: string | boolean;
+        gitlab?: string | boolean;
+        githubActions?: boolean;
       }
     ) => {
       const validSeverities: Severity[] = ["low", "medium", "high", "critical"];
@@ -69,14 +87,23 @@ program
         process.exit(2);
       }
 
-      if (options.staged && options.history) {
-        console.error(chalk.red("Error: Cannot specify both --staged and --history simultaneously."));
+      const activeModes = [
+        options.staged ? "--staged" : null,
+        options.history ? "--history" : null,
+        options.since ? "--since" : null
+      ].filter(Boolean);
+
+      if (activeModes.length > 1) {
+        console.error(chalk.red(`Error: Cannot combine ${activeModes.join(" and ")}. Choose one scan mode.`));
         process.exit(2);
       }
 
-      const scanner = new ProjectScanner();
-      const isMachineOutput = Boolean(options.json || options.sarif);
+      const isMachineOutput = Boolean(
+        options.json || options.sarif || options.junit || options.gitlab
+      );
       const spinner = isMachineOutput || options.verbose ? null : ora("Scanning for secrets...").start();
+
+      const scanner = new ProjectScanner();
 
       try {
         const result = await scanner.scan({
@@ -85,9 +112,13 @@ program
           json: options.json,
           ignore: options.ignore,
           rulesPath: options.rules,
+          maxFileSize: options.maxFileSize,
+          baselinePath: options.baseline,
+          createBaseline: options.createBaseline,
           verbose: options.verbose,
           staged: options.staged,
           history: options.history,
+          since: options.since,
           onFileAction: (filePath: string, status: "scanned" | "ignored" | "binary") => {
             if (!options.verbose) return;
             if (status === "scanned") console.log(`${chalk.green("✓")} ${filePath}`);
@@ -98,13 +129,34 @@ program
 
         if (spinner) spinner.stop();
 
-        if (options.sarif) {
+        if (options.createBaseline) {
+          const outPath = typeof options.createBaseline === "string" ? options.createBaseline : ".gitleak-radar-baseline.json";
+          console.log(chalk.green(`✓ Baseline successfully created at ${outPath} (${result.summary.suppressedFindings ?? 0} findings recorded).`));
+          process.exit(0);
+        }
+
+        // GitHub Actions Annotation
+        if (options.githubActions || (!isMachineOutput && process.env.GITHUB_ACTIONS === "true")) {
+          renderGitHubActionsReport(result);
+        }
+
+        // Format Öncelikleri
+        if (options.junit) {
+          const outputPath = typeof options.junit === "string" ? options.junit : undefined;
+          renderJunitReport(result, outputPath);
+        } else if (options.gitlab) {
+          const outputPath = typeof options.gitlab === "string" ? options.gitlab : undefined;
+          renderGitLabReport(result, outputPath);
+        } else if (options.sarif) {
           const outputPath = typeof options.sarif === "string" ? options.sarif : undefined;
           renderSarifReport(result, outputPath, getPackageVersion());
         } else if (options.json) {
           renderJsonReport(result);
         } else {
           renderTerminalReport(result, targetPath);
+          if (result.summary.suppressedFindings) {
+            console.log(chalk.gray(`  (ℹ ${result.summary.suppressedFindings} known baseline finding(s) suppressed)`));
+          }
         }
 
         if (result.findings.length > 0) {
@@ -120,6 +172,14 @@ program
   );
 
 program
+  .command("explain <rule-id>")
+  .description("Display detailed documentation, pattern, and remediation advice for a specific rule")
+  .argument("[path]", "Repository directory to resolve custom rules from", ".")
+  .action(async (ruleId: string, targetPath?: string) => {
+    await explainRule(ruleId, targetPath || ".");
+  });
+
+program
   .command("init")
   .description("Create a default .gitleak-radar.json configuration file")
   .argument("[path]", "Directory where configuration will be created", ".")
@@ -132,6 +192,7 @@ program
 
     const template = {
       ignore: ["tests", "dist", "node_modules"],
+      maxFileSize: "10MB",
       rules: {},
       customRules: [
         {

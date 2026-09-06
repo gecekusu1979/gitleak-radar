@@ -40,8 +40,6 @@ function validateGlobPattern(pattern: string): void {
   }
 }
 
-// Klasik "nested quantifier" catastrophic-backtracking deseni:
-// (a+)+ veya (x*)* gibi üstel süreye yol açan desenleri derleme anında reddeder.
 const REDOS_NESTED_QUANTIFIER = /\([^()]*[+*][^()]*\)[+*]/;
 
 function assertRegexIsSafe(source: string, ruleId: string): void {
@@ -83,7 +81,8 @@ export function compileCustomRule(def: CustomRuleDefinition): DetectionRule {
 export const ConfigSchema = z.object({
   ignore: z.array(z.string()).default([]),
   rules: z.record(z.enum(VALID_RULE_IDS), z.boolean()).default({}),
-  customRules: z.array(CustomRuleSchema).default([])
+  customRules: z.array(CustomRuleSchema).default([]),
+  maxFileSize: z.union([z.string(), z.number()]).optional()
 });
 
 export type RadarConfig = z.infer<typeof ConfigSchema>;
@@ -184,14 +183,29 @@ export async function loadConfig(targetDir: string): Promise<RadarConfig> {
 }
 
 export function getEffectiveRules(config: RadarConfig, extraRules: DetectionRule[] = []): DetectionRule[] {
-  const activeBuiltIn = DETECTION_RULES.filter((rule) => {
+  const ruleMap = new Map<string, DetectionRule>();
+
+  // 1. Yerleşik kuralları temel olarak ekle
+  for (const rule of DETECTION_RULES) {
+    ruleMap.set(rule.id, rule);
+  }
+
+  // 2. Config customRules kuralları yerleşik kuralların üzerine yazar (override)
+  const configCustomRules = (config.customRules || []).map(compileCustomRule);
+  for (const rule of configCustomRules) {
+    ruleMap.set(rule.id, rule);
+  }
+
+  // 3. CLI/harici dosya kuralları en yüksek öncelikle üzerine yazar
+  for (const rule of extraRules) {
+    ruleMap.set(rule.id, rule);
+  }
+
+  // 4. config.rules ile devre dışı bırakılanları filtrele
+  return Array.from(ruleMap.values()).filter((rule) => {
     if (config.rules && config.rules[rule.id] !== undefined) {
       return config.rules[rule.id];
     }
     return true;
   });
-
-  const configCustomRules = (config.customRules || []).map(compileCustomRule);
-
-  return [...activeBuiltIn, ...configCustomRules, ...extraRules];
 }

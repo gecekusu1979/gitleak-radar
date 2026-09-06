@@ -1,8 +1,8 @@
-import { execFile } from "node:child_process";
+﻿import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import path from "node:path";
 import fs from "node:fs/promises";
-import { type FileContent, MAX_FILE_SIZE_BYTES } from "../scanner/file-reader.js";
+import { type FileContent, DEFAULT_MAX_FILE_SIZE_BYTES } from "../scanner/file-reader.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -57,18 +57,19 @@ export async function getStagedFiles(targetDir: string): Promise<string[]> {
 
 export async function readStagedFileLines(
   gitRoot: string,
-  relativeToGitRoot: string
+  relativeToGitRoot: string,
+  maxSizeBytes: number = DEFAULT_MAX_FILE_SIZE_BYTES
 ): Promise<FileContent | null> {
   const normalizedRelPath = relativeToGitRoot.replace(/\\/g, "/");
   const absolutePath = path.resolve(gitRoot, normalizedRelPath);
 
-  // Path Traversal Koruması: Dosya yolu gitRoot dışına çıkamaz
+  // Path Traversal Koruması
   const relativeCheck = path.relative(gitRoot, absolutePath);
   if (relativeCheck.startsWith("..") || path.isAbsolute(relativeCheck)) {
     return null;
   }
 
-  // Symlink Koruması: Git Index nesne modu 120000 (symlink) ise okuma
+  // Symlink Koruması: Git Index nesne modu 120000 ise okuma
   try {
     const { stdout: lsOut } = await execFileAsync("git", ["ls-files", "-s", "--", normalizedRelPath], { cwd: gitRoot });
     if (lsOut.startsWith("120000")) {
@@ -83,14 +84,14 @@ export async function readStagedFileLines(
       cwd: gitRoot
     });
     const size = parseInt(sizeOut.trim(), 10);
-    if (!Number.isNaN(size) && size > MAX_FILE_SIZE_BYTES) {
+    if (!Number.isNaN(size) && size > maxSizeBytes) {
       return null;
     }
 
     const { stdout } = await execFileAsync("git", ["show", `:${normalizedRelPath}`], {
       cwd: gitRoot,
       encoding: "buffer",
-      maxBuffer: MAX_FILE_SIZE_BYTES + 1024
+      maxBuffer: maxSizeBytes + 1024
     });
 
     const buffer = Buffer.isBuffer(stdout) ? stdout : Buffer.from(stdout);

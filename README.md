@@ -1,19 +1,19 @@
-# GitLeak Radar
+﻿# GitLeak Radar
 
 [![npm version](https://img.shields.io/npm/v/gitleak-radar.svg?color=cb3837)](https://www.npmjs.com/package/gitleak-radar)
 [![npm downloads](https://img.shields.io/npm/dm/gitleak-radar.svg)](https://www.npmjs.com/package/gitleak-radar)
 
-[![CI](https://github.com/gecekusu1979/gitleak-radar/actions/workflows/ci.yml/badge.svg)](https://github.com/gecekusu1979/gitleak-radar/actions)
-[![tests](https://img.shields.io/badge/tests-77%2F77%20passing-brightgreen)](https://github.com/gecekusu1979/gitleak-radar)
+[![CI](https://github.com/gecekusu1979/gitleak-radar/actions/workflows/gitleak-radar.yml/badge.svg)](https://github.com/gecekusu1979/gitleak-radar/actions)
+[![tests](https://img.shields.io/badge/tests-108%2F108%20passing-brightgreen)](https://github.com/gecekusu1979/gitleak-radar)
 [![SARIF](https://img.shields.io/badge/SARIF-v2.1.0%20Compliant-blue.svg)]()
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict%20Mode-3178c6.svg)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18.0.0-339933.svg)](https://nodejs.org/)
 [![Zero Telemetry](https://img.shields.io/badge/Telemetry-0%25%20(Local%20Only)-success.svg)](#security-model)
 
-> **Static credential scanner and automated Git pre-commit hook designed to detect exposed API keys, access tokens, private keys, and database connection strings before code is committed or pushed.**
+> **Enterprise-grade, local-first source code secret scanner and automated Git pre-commit gate designed to intercept exposed API keys, access tokens, private keys, and database credentials before they reach version control or CI/CD pipelines.**
 
-GitLeak Radar runs locally across your codebase, directly against the staged Git index, or across Git commit history. It combines regex-based pattern matching, keyword pre-filtering, Shannon entropy checks for generic API keys, OASIS SARIF v2.1.0 reporting, and fail-closed workflow gates while preserving masked findings and a 0-100 repository security score.
+GitLeak Radar runs locally across your codebase, directly against the staged Git index, across Git commit history, or incrementally on PR branch diffs. It combines regex pattern matching, keyword pre-filtering, character-set-aware Shannon entropy calculation, fail-closed pre-commit hooks, and multi-format reporting while preserving masked findings and a 0-100 repository security score.
 
 GitLeak Radar is designed as a local-first SAST tool for detecting API keys, access tokens, private keys, database credentials, and other sensitive values before they enter commits or CI/CD workflows.
 
@@ -25,6 +25,12 @@ GitLeak Radar is designed as a local-first SAST tool for detecting API keys, acc
 - **Streaming Git History Scanning:** `--history` processes added diff lines incrementally instead of loading the complete commit history into memory, while retaining commit hash, author, and date metadata for findings.
 - **History Diff Hardening:** History scans force `diff.external=` and `--no-ext-diff`, and terminate Git path arguments with `--` to reduce external diff and argument-injection risks.
 - **SARIF v2.1.0 Reporting:** `--sarif [file]` emits OASIS SARIF 2.1.0 output for GitHub Code Scanning and other compatible CI tooling.
+- **Multi-Format Enterprise Reporting:** JUnit XML (`--junit`), GitLab Code Quality (`--gitlab`), and native GitHub Actions annotations (`--github-actions`) complement SARIF output.
+- **Incremental PR Scanning:** `--since <ref>` scans files changed since a commit, branch, or tag, including newly added untracked files.
+- **Baseline / Allowlist Management:** `--create-baseline` snapshots known findings and `--baseline` suppresses them in future scans using SHA-256 fingerprints.
+- **Inline False-Positive Suppression:** `// gitleak-radar:ignore` and `// gitleak-radar:ignore-next-line` can suppress all rules or selected rule IDs.
+- **Rule Explainer:** `gitleak-radar explain <rule-id>` displays pattern details, risk context, and remediation guidance.
+- **Configurable File Size Limits:** `--max-file-size` accepts byte values and human-readable units such as `5MB` and `500KB` across filesystem, staged, and history scans.
 - **True Git Index Isolation:** In `--staged` mode, files are evaluated directly from Git's object database (`git show :<path>`). Modifying or clearing a secret from the working directory after staging cannot bypass detection.
 - **Fail-Closed Pre-Commit Security:** Hook scripts enforce a fail-closed posture (`exit 2`). If `gitleak-radar` or `npx` cannot be executed, commits are blocked rather than silently skipped.
 - **Monorepo & Nested Config Traversal:** `.gitleak-radar.json` configurations are resolved through upward filesystem traversal from the target path.
@@ -59,6 +65,49 @@ Candidates below the configured threshold are discarded as low-complexity values
 ### SARIF Integration
 
 `gitleak-radar scan --sarif report.sarif` writes SARIF v2.1.0 output with rule metadata, source locations, severity levels, masked messages, and commit fingerprints where available. Omitting the file path writes the report to standard output for CI pipelines.
+
+### Additional CI Reporters
+
+```bash
+# JUnit XML for Jenkins, Azure DevOps, and Bitbucket
+gitleak-radar scan . --junit junit.xml
+
+# GitLab Code Quality report
+gitleak-radar scan . --gitlab gl-code-quality-report.json
+
+# GitHub Actions inline annotations
+gitleak-radar scan . --github-actions
+```
+
+JUnit and GitLab reports accept an optional output path; when omitted, they are written to standard output. Findings remain masked in every output format.
+
+### Incremental Scans and Baselines
+
+Scan only files changed relative to a Git ref, which is useful for pull-request checks:
+
+```bash
+gitleak-radar scan --since origin/main --github-actions
+```
+
+To adopt GitLeak Radar in a legacy repository without failing on existing findings:
+
+```bash
+gitleak-radar scan --create-baseline
+gitleak-radar scan --baseline .gitleak-radar-baseline.json
+```
+
+Baseline entries use SHA-256 fingerprints based on finding coordinates and rule identity. Newly introduced findings continue to fail the scan.
+
+### Inline Ignore Directives
+
+Suppress a finding on the same line or on the following line. A rule ID may be supplied to keep the suppression narrow:
+
+```typescript
+// gitleak-radar:ignore-next-line
+const mockToken = "sk_live_" + "abcdef1234567890abcdef1234";
+
+const sampleKey = "AKIA1234567890EXAMPLE"; // gitleak-radar:ignore aws-access-key
+```
 
 ## Performance
 
@@ -204,7 +253,21 @@ Commands:
 
 | Option | Description | Default |
 | --- | --- | --- |
+| `-s, --severity <level>` | Minimum severity: `low`, `medium`, `high`, or `critical` | `low` |
+| `-i, --ignore <dirs...>` | Additional directory patterns to ignore | - |
 | `-r, --rules <file>` | Path to external custom rules JSON file | - |
+| `--max-file-size <size>` | Maximum file size, such as `5MB`, `500KB`, or bytes | `10MB` |
+| `--baseline <file>` | Suppress findings recorded in a baseline file | - |
+| `--create-baseline [file]` | Create a baseline snapshot and exit | `.gitleak-radar-baseline.json` |
+| `--staged` | Scan only files in the Git index | - |
+| `--history` | Scan added lines across Git commit history | - |
+| `--since <ref>` | Scan files changed since a Git ref | - |
+| `--json` | Emit machine-readable JSON | - |
+| `--sarif [file]` | Emit SARIF v2.1.0 to stdout or a file | - |
+| `--junit [file]` | Emit JUnit XML to stdout or a file | - |
+| `--gitlab [file]` | Emit GitLab Code Quality JSON to stdout or a file | - |
+| `--github-actions` | Emit GitHub Actions workflow annotations | - |
+| `-v, --verbose` | Show scanned, ignored, and binary files | - |
 
 ```bash
 # Scan with specific severity threshold (low, medium, high, critical)
@@ -224,6 +287,12 @@ gitleak-radar scan . --history
 
 # Write SARIF v2.1.0 output to a file (omit the path to print to stdout)
 gitleak-radar scan . --sarif report.sarif
+
+# Scan only changes since the main branch
+gitleak-radar scan . --since origin/main --github-actions
+
+# Apply a human-readable file-size limit
+gitleak-radar scan . --max-file-size 5MB
 
 # Inspect detailed command help
 gitleak-radar scan --help
@@ -366,7 +435,7 @@ pnpm install
 # Run TypeScript typechecks
 pnpm typecheck
 
-# Run the Vitest test suite (77 automated tests)
+# Run the Vitest test suite (108 automated tests)
 pnpm test
 
 # Build the production bundle
@@ -385,18 +454,16 @@ npm pack --dry-run
 
 ## Roadmap
 
-### Completed in v1.2.0
+### Completed in v1.3.0
 
 - [x] Custom user-defined regex and entropy rules via `.gitleak-radar.json` and `--rules`
 - [x] CLI configuration bootstrapping (`gitleak-radar init`)
 - [x] History streaming memory guard (10MB per-file boundary)
-
-### Planned for Upcoming Releases (v1.3.0+)
-
-- [ ] Configurable maximum file size limit via CLI (`--max-file-size`) and configuration
-- [ ] Rule explainer command (`gitleak-radar explain <rule-id>`)
-- [ ] Automated benchmark suite comparing throughput and false-positive rates against Gitleaks and TruffleHog
-- [ ] GitLab CI and Bitbucket Pipelines template recipes
+- [x] Configurable maximum file size limit via CLI (`--max-file-size`) and configuration
+- [x] Rule explainer command (`gitleak-radar explain <rule-id>`)
+- [x] Baseline suppression and incremental scans via `--baseline`, `--create-baseline`, and `--since`
+- [x] JUnit, GitLab Code Quality, and GitHub Actions reporters
+- [x] GitLab CI integration template
 
 ## License
 

@@ -1,0 +1,22 @@
+﻿stages:
+  - test
+  - security
+
+gitleak-radar:
+  stage: security
+  image: node:20-alpine
+  before_script:
+    - apk add --no-cache git
+    - npm install -g pnpm
+    - pnpm install --frozen-lockfile
+    - pnpm run build
+  script:
+    - node dist/cli/index.js scan . --gitlab gl-code-quality-report.json --junit junit-secrets.xml -s medium
+  artifacts:
+    when: always
+    reports:
+      codequality: gl-code-quality-report.json
+      junit: junit-secrets.xml
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

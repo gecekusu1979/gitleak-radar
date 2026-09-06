@@ -1,6 +1,6 @@
-{
+﻿{
   "name": "gitleak-radar",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "description": "Fast, local-first source code secret scanner and pre-commit gate CLI.",
   "keywords": [
     "security",
@@ -8,7 +8,10 @@
     "devsecops",
     "credentials",
     "pre-commit",
-    "cli"
+    "cli",
+    "sarif",
+    "junit",
+    "gitlab-codequality"
   ],
   "license": "GPL-3.0-or-later",
   "author": "gecekusu1979",
@@ -63,6 +66,18 @@
     "./sarif": {
       "types": "./dist/reporters/sarif.d.ts",
       "import": "./dist/reporters/sarif.js"
+    },
+    "./junit": {
+      "types": "./dist/reporters/junit.d.ts",
+      "import": "./dist/reporters/junit.js"
+    },
+    "./gitlab": {
+      "types": "./dist/reporters/gitlab.d.ts",
+      "import": "./dist/reporters/gitlab.js"
+    },
+    "./github-actions": {
+      "types": "./dist/reporters/github-actions.d.ts",
+      "import": "./dist/reporters/github-actions.js"
     }
   }
 }

@@ -3,6 +3,7 @@ import * as readline from "node:readline";
 import { SecretDetector } from "../detectors/detector.js";
 import { Finding, Severity } from "../types/index.js";
 import { shouldIgnorePath } from "../scanner/file-filter.js";
+import { DEFAULT_MAX_FILE_SIZE_BYTES } from "../scanner/file-reader.js";
 
 export interface HistoryScanResult {
   findings: Finding[];
@@ -12,7 +13,6 @@ export interface HistoryScanResult {
 }
 
 const COMMIT_START_MARKER = "__GITLEAK_COMMIT_START__";
-const MAX_DIFF_BYTES_PER_FILE = 10 * 1024 * 1024; // 10 MB sınırı
 
 export async function scanGitHistory(
   repoPath: string,
@@ -20,7 +20,8 @@ export async function scanGitHistory(
   minSeverity: Severity = "low",
   ignorePatterns: string[] = [],
   maxCommits?: number,
-  onProgress?: (filePath: string, status: "scanned" | "ignored" | "binary") => void
+  onProgress?: (filePath: string, status: "scanned" | "ignored" | "binary") => void,
+  maxDiffBytesPerFile: number = DEFAULT_MAX_FILE_SIZE_BYTES
 ): Promise<HistoryScanResult> {
   return new Promise((resolve, reject) => {
     const gitArgs = [
@@ -130,7 +131,7 @@ export async function scanGitHistory(
         const addedContent = line.slice(1);
         currentFileDiffBytes += Buffer.byteLength(addedContent, "utf8");
 
-        if (currentFileDiffBytes > MAX_DIFF_BYTES_PER_FILE) {
+        if (currentFileDiffBytes > maxDiffBytesPerFile) {
           return;
         }
 

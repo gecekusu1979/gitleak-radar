@@ -1,6 +1,7 @@
-import { type DetectionRule, type Finding, type Severity, SeverityOrder } from "../types/index.js";
+﻿import { type DetectionRule, type Finding, type Severity, SeverityOrder } from "../types/index.js";
 import { isPlaceholderOrExample } from "../scanner/file-filter.js";
-import { calculateShannonEntropy } from "./entropy.js";
+import { calculateShannonEntropy, isHighEntropyToken } from "./entropy.js";
+import { isLineIgnoredByDirective } from "./inline-ignore.js";
 
 export const MAX_LINE_LENGTH = 8192;
 
@@ -24,15 +25,24 @@ export class SecretDetector {
     line: string,
     lineNumber: number,
     filePath: string,
-    minSeverity: Severity = "low"
+    minSeverity: Severity = "low",
+    previousLine?: string
   ): Finding[] {
     const findings: Finding[] = [];
     const targetLine = line.length > MAX_LINE_LENGTH ? line.slice(0, MAX_LINE_LENGTH) : line;
     const lowerLine = targetLine.toLowerCase();
     const minSeverityWeight = SeverityOrder[minSeverity];
 
+    if (isLineIgnoredByDirective(targetLine, previousLine)) {
+      return [];
+    }
+
     for (const rule of this.rules) {
       if (SeverityOrder[rule.severity] < minSeverityWeight) {
+        continue;
+      }
+
+      if (isLineIgnoredByDirective(targetLine, previousLine, rule.id)) {
         continue;
       }
 
@@ -53,10 +63,17 @@ export class SecretDetector {
           continue;
         }
 
-        if (rule.requiresEntropy || typeof rule.minEntropy === "number") {
+        // 1. Dinamik karakter kumesi tabanli entropi denetimi
+        if (rule.requiresEntropy) {
+          if (!isHighEntropyToken(rawSecret)) {
+            continue;
+          }
+        }
+
+        // 2. Kurala ozel tanimlanmis mutlak Shannon entropi esigi
+        if (typeof rule.minEntropy === "number") {
           const tokenEntropy = calculateShannonEntropy(rawSecret);
-          const minThreshold = typeof rule.minEntropy === "number" ? rule.minEntropy : 3.0;
-          if (tokenEntropy < minThreshold) {
+          if (tokenEntropy < rule.minEntropy) {
             continue;
           }
         }

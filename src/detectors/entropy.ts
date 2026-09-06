@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Verilen metnin Shannon entropisini hesaplar (bit cinsinden).
  */
 export function calculateShannonEntropy(data: string): number {
@@ -25,7 +25,7 @@ export function calculateShannonEntropy(data: string): number {
 export type CharsetCategory = "hex" | "base64" | "ascii";
 
 /**
- * Verilen dizginin karakter kümesini sınıflandırır.
+ * Verilen dizginin karakter kumesini siniflandirir.
  */
 export function detectCharset(token: string): CharsetCategory {
   if (/^[0-9a-fA-F]+$/.test(token)) {
@@ -45,14 +45,14 @@ export interface EntropyThresholds {
 }
 
 export const DEFAULT_ENTROPY_THRESHOLDS: EntropyThresholds = {
-  hex: 3.1,       // 0-9, a-f için yüksek rastgelelik eşiği (maks 4.0)
-  base64: 4.6,    // Base64 için yüksek rastgelelik eşiği (maks 6.0)
-  ascii: 4.8,     // Genel ASCII için eşik
-  minTokenLength: 16 // Yanlış pozitifleri önlemek için minimum token uzunluğu
+  hex: 3.0,          // 0-9, a-f icin rastgelelik esigi (maks 4.0)
+  base64: 4.2,       // Base64 ve token karakter kumesi icin esik (maks 6.0)
+  ascii: 4.5,        // Genel ASCII icin esik
+  minTokenLength: 16 // Yanlis pozitifleri onlemek icin minimum token uzunlugu
 };
 
 /**
- * Token'ın karakter kümesine göre yüksek entropiye sahip bir secret adayı olup olmadığını belirler.
+ * Token'in karakter kumesine gore yuksek entropiye sahip bir secret adayi olup olmadigini belirler.
  */
 export function isHighEntropyToken(
   token: string,

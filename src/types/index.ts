@@ -56,8 +56,12 @@ export interface ScanOptions {
   verbose?: boolean;
   staged?: boolean;
   history?: boolean;
+  since?: string;
   maxCommits?: number;
+  maxFileSize?: string | number;
   rulesPath?: string;
+  baselinePath?: string;
+  createBaseline?: boolean | string;
   onFileAction?: (filePath: string, status: "scanned" | "ignored" | "binary") => void;
 }
 
@@ -74,6 +78,7 @@ export interface ScanResult {
     filesScanned: number;
     linesScanned: number;
     findings: number;
+    suppressedFindings?: number;
     score: number;
     tier: ScoreTier;
     durationMs: number;

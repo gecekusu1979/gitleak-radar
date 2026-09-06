@@ -85,6 +85,31 @@ describe("Custom Rules Engine", () => {
     expect(highEntropy).toHaveLength(1);
   });
 
+  it("allows custom rules to override built-in rules with the same ID", () => {
+    const overrideDef: CustomRuleDefinition = {
+      id: "aws-access-key",
+      name: "Custom Corporate AWS Key",
+      description: "Overridden rule for internal AWS patterns",
+      severity: "medium",
+      regex: "AKIA_CUSTOM_[A-Z0-9]{16}"
+    };
+
+    const effective = getEffectiveRules({
+      ignore: [],
+      rules: {},
+      customRules: [overrideDef]
+    });
+
+    const overriddenRule = effective.find((r) => r.id === "aws-access-key");
+    expect(overriddenRule).toBeDefined();
+    expect(overriddenRule?.name).toBe("Custom Corporate AWS Key");
+    expect(overriddenRule?.severity).toBe("medium");
+
+    // Toplam kural listesinde ID tekil kalmalı (çiftlenmemeli)
+    const duplicateCount = effective.filter((r) => r.id === "aws-access-key").length;
+    expect(duplicateCount).toBe(1);
+  });
+
   it("loads and parses external custom rules file correctly", async () => {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "gitleak-custom-rules-"));
     const rulesFile = path.join(tempDir, "rules.json");

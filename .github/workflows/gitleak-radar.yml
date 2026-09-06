@@ -1,0 +1,60 @@
+﻿name: GitLeak Radar Security Scan
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  secret-scan:
+    name: Scan Secrets & Credentials
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Install Dependencies & Build
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run build
+
+      - name: Run PR Incremental Scan
+        if: github.event_name == 'pull_request'
+        run: |
+          node dist/cli/index.js scan . \
+            --since "origin/${{ github.base_ref }}" \
+            --sarif gitleak-results.sarif \
+            --github-actions \
+            -s medium
+
+      - name: Run Full Scan on Push
+        if: github.event_name == 'push'
+        run: |
+          node dist/cli/index.js scan . \
+            --sarif gitleak-results.sarif \
+            --github-actions \
+            -s medium
+
+      - name: Upload SARIF to GitHub Security Tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always() && hashFiles('gitleak-results.sarif') != ''
+        with:
+          sarif_file: gitleak-results.sarif
