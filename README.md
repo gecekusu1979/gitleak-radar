@@ -103,7 +103,7 @@ Baseline entries use SHA-256 fingerprints based on finding coordinates and rule 
 
 Use the composite action from a tagged release. Pinning the tag or commit is
 recommended for reproducible CI. The action release and the npm scanner
-release are versioned independently: `v1.4.7` runs the reviewed
+release are versioned independently: `v1.4.8` runs the reviewed
 `gitleak-radar@1.4.1` package by default.
 
 ```yaml
@@ -116,7 +116,7 @@ steps:
     with:
       fetch-depth: 0
   - name: Scan for secrets
-    uses: gecekusu1979/gitleak-radar@v1.4.7
+    uses: gecekusu1979/gitleak-radar@v1.4.8
     with:
       version: '1.4.1'
       upload-sarif: true
