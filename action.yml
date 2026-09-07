@@ -162,42 +162,7 @@ runs:
         echo "exit-code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
 
         if [ -n "$GITHUB_STEP_SUMMARY" ]; then
-          SARIF_PATH="$INPUT_SARIF_FILE" SUMMARY_PATH="$GITHUB_STEP_SUMMARY" node <<'NODE'
-const fs = require('fs');
-const sarifPath = process.env.SARIF_PATH;
-const summaryPath = process.env.SUMMARY_PATH;
-const escapeMarkdown = (value) => String(value ?? 'unknown')
-  .replace(/[`|\\\r\n]/g, (character) => `\\${character}`);
-
-try {
-  const sarif = JSON.parse(fs.readFileSync(sarifPath, 'utf8'));
-  const results = sarif.runs?.[0]?.results || [];
-  let summary = '## 🛡️ GitLeak Radar Scan\n\n';
-  summary += results.length === 0
-    ? '✅ **No secrets detected.**\n\n'
-    : `⚠️ **${results.length} potential secret(s) detected.**\n\n`;
-  summary += `- **Scanner:** \`gitleak-radar\`\n`;
-  summary += `- **SARIF report:** \`${escapeMarkdown(sarifPath)}\`\n\n`;
-
-  if (results.length > 0) {
-    summary += '| Rule | File | Line |\n';
-    summary += '| :--- | :--- | ---: |\n';
-    for (const result of results.slice(0, 10)) {
-      const location = result.locations?.[0]?.physicalLocation;
-      const file = location?.artifactLocation?.uri;
-      const line = location?.region?.startLine;
-      summary += `| \`${escapeMarkdown(result.ruleId)}\` | \`${escapeMarkdown(file)}\` | ${Number.isInteger(line) ? line : '—'} |\n`;
-    }
-    if (results.length > 10) {
-      summary += `\n*Showing the first 10 findings. See the SARIF report for all ${results.length} findings.*\n`;
-    }
-  }
-
-  fs.appendFileSync(summaryPath, `${summary}\n`);
-} catch (error) {
-  console.warn(`Unable to write GitLeak Radar job summary: ${error.message}`);
-}
-        NODE
+          SARIF_PATH="$INPUT_SARIF_FILE" SUMMARY_PATH="$GITHUB_STEP_SUMMARY" node -e "const fs=require('fs');const sarifPath=process.env.SARIF_PATH;const summaryPath=process.env.SUMMARY_PATH;const escapeMarkdown=value=>String(value??'unknown').replace(/[\`|\\\\\\r\\n]/g,character=>\`\\\\\${character}\`);try{const sarif=JSON.parse(fs.readFileSync(sarifPath,'utf8'));const results=sarif.runs?.[0]?.results||[];let summary='## 🛡️ GitLeak Radar Scan\\n\\n';summary+=results.length===0?'✅ **No secrets detected.**\\n\\n':\`⚠️ **\${results.length} potential secret(s) detected.**\\n\\n\`;summary+=\`- **Scanner:** \\\`gitleak-radar\\\`\\n\`;summary+=\`- **SARIF report:** \\\`\${escapeMarkdown(sarifPath)}\\\`\\n\\n\`;if(results.length>0){summary+='| Rule | File | Line |\\n| :--- | :--- | ---: |\\n';for(const result of results.slice(0,10)){const location=result.locations?.[0]?.physicalLocation;const file=location?.artifactLocation?.uri;const line=location?.region?.startLine;summary+=\`| \\\`\${escapeMarkdown(result.ruleId)}\\\` | \\\`\${escapeMarkdown(file)}\\\` | \${Number.isInteger(line)?line:'—'} |\\n\`}if(results.length>10)summary+=\`\\n*Showing the first 10 findings. See the SARIF report for all \${results.length} findings.*\\n\`}fs.appendFileSync(summaryPath,summary+'\\n')}catch(error){console.warn(\`Unable to write GitLeak Radar job summary: \${error.message}\`)}"
         fi
 
         if [ "$EXIT_CODE" -eq 2 ]; then
