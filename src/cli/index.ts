@@ -22,7 +22,7 @@ function getPackageVersion(): string {
     const currentDir = path.dirname(fileURLToPath(import.meta.url));
     const packagePath = path.resolve(currentDir, "../../package.json");
     if (fs.existsSync(packagePath)) {
-      const raw = fs.readFileSync(packagePath, "utf-8");
+      const raw = fs.readFileSync(packagePath, "utf-8").replace(/^\uFEFF/, "");
       return JSON.parse(raw).version || "1.0.0";
     }
   } catch {

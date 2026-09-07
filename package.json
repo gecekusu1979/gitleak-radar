@@ -1,6 +1,6 @@
 ﻿{
   "name": "gitleak-radar",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Fast, local-first source code secret scanner and pre-commit gate CLI.",
   "keywords": [
     "security",
@@ -81,4 +81,3 @@
     }
   }
 }
-
