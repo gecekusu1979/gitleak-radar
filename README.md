@@ -102,7 +102,9 @@ Baseline entries use SHA-256 fingerprints based on finding coordinates and rule 
 ## GitHub Action
 
 Use the composite action from a tagged release. Pinning the tag or commit is
-recommended for reproducible CI:
+recommended for reproducible CI. The action release and the npm scanner
+release are versioned independently: `v1.4.7` runs the reviewed
+`gitleak-radar@1.4.1` package by default.
 
 ```yaml
 permissions:
@@ -112,10 +114,12 @@ permissions:
 steps:
   - uses: actions/checkout@v4
   - name: Scan for secrets
-    uses: gecekusu1979/gitleak-radar@v1.4.6
+    uses: gecekusu1979/gitleak-radar@v1.4.7
     with:
+      version: '1.4.1'
       upload-sarif: true
       fail-on-findings: true
+      pr-comment: false
 ```
 
 The action passes inputs to the scanner as process arguments rather than
@@ -123,6 +127,13 @@ shell-expanded source code. Optional PR comments require a token and should
 only be enabled in workflows where the token has the minimum required
 permissions. See [SECURITY.md](SECURITY.md) before using the action with
 untrusted pull requests.
+
+For high-assurance workflows, replace the release tag with the reviewed commit
+SHA after verifying the release contents:
+
+```yaml
+uses: gecekusu1979/gitleak-radar@<reviewed-commit-sha>
+```
 
 ### Inline Ignore Directives
 
