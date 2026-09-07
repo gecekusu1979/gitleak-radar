@@ -14,7 +14,7 @@ inputs:
   version:
     description: 'Pinned gitleak-radar npm version. Bump this deliberately on each release for reproducible scans.'
     required: false
-    default: '1.4.0'
+    default: '1.4.1'
   severity:
     description: 'Minimum severity threshold (low, medium, high, critical)'
     required: false
@@ -222,4 +222,3 @@ runs:
               body: body
             });
           }
-
