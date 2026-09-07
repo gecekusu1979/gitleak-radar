@@ -82,31 +82,49 @@ runs:
 
     - name: Install GitLeak Radar
       shell: bash
-      run: npm install -g "gitleak-radar@${{ inputs.version }}"
+      env:
+        GITLEAK_RADAR_VERSION: ${{ inputs.version }}
+      run: |
+        if [[ ! "$GITLEAK_RADAR_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+          echo "::error::version must be an exact semantic version."
+          exit 2
+        fi
+        npm install -g "gitleak-radar@$GITLEAK_RADAR_VERSION"
 
     - name: Run GitLeak Radar
       id: scan
       shell: bash
+      env:
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_SEVERITY: ${{ inputs.severity }}
+        INPUT_SINCE: ${{ inputs.since }}
+        INPUT_STAGED: ${{ inputs.staged }}
+        INPUT_HISTORY: ${{ inputs.history }}
+        INPUT_BASELINE: ${{ inputs.baseline }}
+        INPUT_MAX_FILE_SIZE: ${{ inputs.max-file-size }}
+        INPUT_RULES: ${{ inputs.rules }}
+        INPUT_SARIF_FILE: ${{ inputs.sarif-file }}
+        INPUT_FAIL_ON_FINDINGS: ${{ inputs.fail-on-findings }}
       run: |
         set +e
 
-        ARGS=(scan "${{ inputs.path }}" --severity "${{ inputs.severity }}" --github-actions --sarif "${{ inputs.sarif-file }}")
+        ARGS=(scan "$INPUT_PATH" --severity "$INPUT_SEVERITY" --github-actions --sarif "$INPUT_SARIF_FILE")
 
-        if [ -n "${{ inputs.since }}" ]; then ARGS+=(--since "${{ inputs.since }}"); fi
-        if [ "${{ inputs.staged }}" = "true" ]; then ARGS+=(--staged); fi
-        if [ "${{ inputs.history }}" = "true" ]; then ARGS+=(--history); fi
-        if [ -n "${{ inputs.baseline }}" ]; then ARGS+=(--baseline "${{ inputs.baseline }}"); fi
-        if [ -n "${{ inputs.max-file-size }}" ]; then ARGS+=(--max-file-size "${{ inputs.max-file-size }}"); fi
-        if [ -n "${{ inputs.rules }}" ]; then ARGS+=(--rules "${{ inputs.rules }}"); fi
+        if [ -n "$INPUT_SINCE" ]; then ARGS+=(--since "$INPUT_SINCE"); fi
+        if [ "$INPUT_STAGED" = "true" ]; then ARGS+=(--staged); fi
+        if [ "$INPUT_HISTORY" = "true" ]; then ARGS+=(--history); fi
+        if [ -n "$INPUT_BASELINE" ]; then ARGS+=(--baseline "$INPUT_BASELINE"); fi
+        if [ -n "$INPUT_MAX_FILE_SIZE" ]; then ARGS+=(--max-file-size "$INPUT_MAX_FILE_SIZE"); fi
+        if [ -n "$INPUT_RULES" ]; then ARGS+=(--rules "$INPUT_RULES"); fi
 
         gitleak-radar "${ARGS[@]}"
         EXIT_CODE=$?
 
         set -e
 
-        FINDINGS=$(node -e "
+        FINDINGS=$(SARIF_PATH="$INPUT_SARIF_FILE" node -e "
           try {
-            const d = JSON.parse(require('fs').readFileSync('${{ inputs.sarif-file }}', 'utf-8'));
+            const d = JSON.parse(require('fs').readFileSync(process.env.SARIF_PATH, 'utf-8'));
             console.log(d.runs?.[0]?.results?.length ?? 0);
           } catch {
             console.log(0);
@@ -121,7 +139,7 @@ runs:
           exit 2
         fi
 
-        if [ "$EXIT_CODE" -eq 1 ] && [ "${{ inputs.fail-on-findings }}" = "true" ]; then
+        if [ "$EXIT_CODE" -eq 1 ] && [ "$INPUT_FAIL_ON_FINDINGS" = "true" ]; then
           exit 1
         fi
 
@@ -138,9 +156,11 @@ runs:
       uses: actions/github-script@v7
       with:
         github-token: ${{ inputs.github-token }}
+      env:
+        SARIF_PATH: ${{ inputs.sarif-file }}
         script: |
           const fs = require('fs');
-          const sarifPath = '${{ inputs.sarif-file }}';
+          const sarifPath = process.env.SARIF_PATH;
           let findingsCount = 0;
           let results = [];
 
@@ -154,6 +174,9 @@ runs:
             }
           }
 
+          const tableValue = (value) => String(value ?? 'unknown')
+            .replace(/[`|\\\r\n]/g, (character) => `\\${character}`);
+
           let body = '### 🛡️ GitLeak Radar Security Scan Report\n\n';
           if (findingsCount === 0) {
             body += '✅ **No secrets detected!** Your code is clean and secure.\n';
@@ -162,11 +185,11 @@ runs:
             body += '| Severity | Rule ID | File | Location |\n';
             body += '| :--- | :--- | :--- | :--- |\n';
             for (const r of results.slice(0, 10)) {
-              const ruleId = r.ruleId || 'unknown';
+              const ruleId = tableValue(r.ruleId);
               const level = r.level === 'error' ? '🔴 Critical/High' : '🟡 Warning';
               const loc = r.locations?.[0]?.physicalLocation;
-              const file = loc?.artifactLocation?.uri || 'unknown';
-              const line = loc?.region?.startLine || 1;
+              const file = tableValue(loc?.artifactLocation?.uri);
+              const line = Number.isInteger(loc?.region?.startLine) ? loc.region.startLine : 1;
               body += `| ${level} | \`${ruleId}\` | \`${file}\` | Satır ${line} |\n`;
             }
             if (findingsCount > 10) {
@@ -199,6 +222,4 @@ runs:
               body: body
             });
           }
-
-
 
