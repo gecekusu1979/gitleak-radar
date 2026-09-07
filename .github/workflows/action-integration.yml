@@ -1,0 +1,39 @@
+name: Marketplace Action Integration
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  composite-action:
+    name: Run composite action on GitHub-hosted runner
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Run local action
+        id: scan
+        uses: ./
+        with:
+          version: '1.4.1'
+          upload-sarif: false
+          upload-artifact: true
+          artifact-name: integration-sarif
+          fail-on-findings: false
+
+      - name: Verify action outputs
+        shell: bash
+        env:
+          FINDINGS_COUNT: ${{ steps.scan.outputs.findings-count }}
+          EXIT_CODE: ${{ steps.scan.outputs.exit-code }}
+        run: |
+          set -euo pipefail
+          [[ "$FINDINGS_COUNT" =~ ^[0-9]+$ ]]
+          [[ "$EXIT_CODE" == "0" || "$EXIT_CODE" == "1" ]]
+          test -s gitleak-radar-results.sarif

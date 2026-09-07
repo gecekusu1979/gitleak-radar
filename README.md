@@ -112,12 +112,15 @@ permissions:
   security-events: write
 
 steps:
-  - uses: actions/checkout@v4
+  - uses: actions/checkout@v7
+    with:
+      fetch-depth: 0
   - name: Scan for secrets
     uses: gecekusu1979/gitleak-radar@v1.4.7
     with:
       version: '1.4.1'
       upload-sarif: true
+      upload-artifact: true
       fail-on-findings: true
       pr-comment: false
 ```
@@ -127,6 +130,40 @@ shell-expanded source code. Optional PR comments require a token and should
 only be enabled in workflows where the token has the minimum required
 permissions. See [SECURITY.md](SECURITY.md) before using the action with
 untrusted pull requests.
+
+After each scan, the action writes a masked, secret-free summary to the
+workflow's **Actions job summary**. It includes the result count and the first
+10 finding locations without exposing matched secret values. The complete
+structured report remains available in the generated SARIF file and, when
+enabled, the GitHub Security tab.
+
+SARIF files and workflow artifacts can contain repository-relative file paths,
+rule identifiers, and finding locations. Treat uploaded artifacts as sensitive
+CI output and restrict workflow permissions and artifact access accordingly.
+
+The Marketplace action runs on Node.js 24 and installs the exact scanner
+version with npm lifecycle scripts disabled. This keeps the action aligned with
+GitHub's current Actions runtime and reduces supply-chain execution surface
+during installation.
+
+| Input | Default | Purpose |
+| --- | --- | --- |
+| `path` | `.` | Directory to scan |
+| `version` | `1.4.1` | Exact npm scanner version |
+| `severity` | `low` | Minimum finding severity |
+| `since` | empty | Scan changes since a Git ref |
+| `staged` | `false` | Scan staged Git index files |
+| `history` | `false` | Scan Git commit history |
+| `baseline` | empty | Suppress accepted findings |
+| `rules` | empty | Custom rules JSON path |
+| `upload-sarif` | `true` | Upload SARIF to GitHub Security |
+| `upload-artifact` | `false` | Preserve SARIF as a workflow artifact |
+| `artifact-name` | `gitleak-radar-results` | Name of the SARIF artifact |
+| `fail-on-findings` | `true` | Fail when findings are detected |
+| `pr-comment` | `false` | Add a PR summary comment |
+
+Use `fetch-depth: 0` when enabling `history: true` or scanning changes against
+a remote base ref. This makes the required Git commits available to the scan.
 
 For high-assurance workflows, replace the release tag with the reviewed commit
 SHA after verifying the release contents:
