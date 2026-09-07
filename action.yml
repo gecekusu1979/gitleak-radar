@@ -3,8 +3,8 @@ description: Scan repositories for leaked secrets
 author: gecekusu1979
 
 branding:
-  icon: 'shield'
-  color: 'red'
+  icon: key
+  color: purple
 
 inputs:
   path:
