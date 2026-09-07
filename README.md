@@ -4,7 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/gitleak-radar.svg)](https://www.npmjs.com/package/gitleak-radar)
 
 [![CI](https://github.com/gecekusu1979/gitleak-radar/actions/workflows/gitleak-radar.yml/badge.svg)](https://github.com/gecekusu1979/gitleak-radar/actions)
-[![tests](https://img.shields.io/badge/tests-108%2F108%20passing-brightgreen)](https://github.com/gecekusu1979/gitleak-radar)
+[![tests](https://img.shields.io/badge/tests-113%2F113%20passing-brightgreen)](https://github.com/gecekusu1979/gitleak-radar)
 [![SARIF](https://img.shields.io/badge/SARIF-v2.1.0%20Compliant-blue.svg)]()
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict%20Mode-3178c6.svg)](https://www.typescriptlang.org/)
@@ -37,6 +37,7 @@ GitLeak Radar is designed as a local-first SAST tool for detecting API keys, acc
 - **High-Performance Keyword Pre-Filtering:** Fast substring pre-screening via `rule.keywords` eliminates unnecessary regex evaluations on unrelated lines.
 - **Leak-Safe Finding Contract:** Plaintext secrets are excluded from the core `Finding` data model. Terminal and JSON reporters exclusively expose masked fingerprints (e.g., `AKIA********1234`).
 - **Self-Security Hardening:** Hardened against ReDoS on minified bundles (`MAX_LINE_LENGTH = 8192`), symlink traversal exploits (`fs.lstat` and Git mode `120000`), and Git CLI argument injection (`--` option delimiters).
+- **Isolated Custom Regex Evaluation:** Custom rules are evaluated in time-limited worker threads to contain catastrophic backtracking; invalid or timed-out rules fail safely.
 - **Default Test Directory Coverage:** `tests/` and `test/` directories are scanned by default to prevent hardcoded credentials from leaking through test fixtures or mock environments.
 - **Unquoted `.env` Secret Detection:** Robust capture rules support both quoted and unquoted environment variable definitions (e.g., `API_KEY=sk_live_...`), preserving comments and boundary safety.
 - **Path-Aware Placeholder Filtering:** Distinct placeholder logic ensures real credentials containing words like `test` or `dummy` (e.g., `sk_test_...`) in production code are never filtered out, while documentation and fixtures retain test-token bypasses.
@@ -97,6 +98,31 @@ gitleak-radar scan --baseline .gitleak-radar-baseline.json
 ```
 
 Baseline entries use SHA-256 fingerprints based on finding coordinates and rule identity. Newly introduced findings continue to fail the scan.
+
+## GitHub Action
+
+Use the composite action from a tagged release. Pinning the tag or commit is
+recommended for reproducible CI:
+
+```yaml
+permissions:
+  contents: read
+  security-events: write
+
+steps:
+  - uses: actions/checkout@v4
+  - name: Scan for secrets
+    uses: gecekusu1979/gitleak-radar@v1.4.0
+    with:
+      upload-sarif: true
+      fail-on-findings: true
+```
+
+The action passes inputs to the scanner as process arguments rather than
+shell-expanded source code. Optional PR comments require a token and should
+only be enabled in workflows where the token has the minimum required
+permissions. See [SECURITY.md](SECURITY.md) before using the action with
+untrusted pull requests.
 
 ### Inline Ignore Directives
 
@@ -381,7 +407,7 @@ When scanning subdirectories or packages (for example, `gitleak-radar scan packa
 - **Git Argument Injection Delimiters:** Git CLI invocations isolate target paths behind explicit `--` option terminators.
 - **Safe Process Invocation:** All Git commands run through `child_process.execFile` with isolated argument vectors. Shell string concatenation is avoided.
 - **Fingerprinting Only:** The `Finding` model omits raw secret values. Reporters receive masked strings instead of plaintext credentials.
-- **Zero Network Interaction:** GitLeak Radar contains zero network dependencies, telemetry emitters, or cloud connections. Scanning logic executes entirely on the local host.
+- **Zero Scanner Telemetry:** The scanner does not send source code, findings, or credentials to a GitLeak Radar service. CI platforms and package managers may still perform their own network operations.
 
 ## Exit Codes
 
@@ -435,7 +461,7 @@ pnpm install
 # Run TypeScript typechecks
 pnpm typecheck
 
-# Run the Vitest test suite (108 automated tests)
+# Run the Vitest test suite (113 automated tests)
 pnpm test
 
 # Build the production bundle
@@ -454,7 +480,7 @@ npm pack --dry-run
 
 ## Roadmap
 
-### Completed in v1.3.0
+### Completed in v1.4.0
 
 - [x] Custom user-defined regex and entropy rules via `.gitleak-radar.json` and `--rules`
 - [x] CLI configuration bootstrapping (`gitleak-radar init`)
@@ -464,6 +490,7 @@ npm pack --dry-run
 - [x] Baseline suppression and incremental scans via `--baseline`, `--create-baseline`, and `--since`
 - [x] JUnit, GitLab Code Quality, and GitHub Actions reporters
 - [x] GitLab CI integration template
+- [x] ReDoS-safe worker-thread regex execution and GitHub Action hardening
 
 ## License
 
