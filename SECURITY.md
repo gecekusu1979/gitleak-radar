@@ -11,9 +11,9 @@ We actively provide security patches and updates for the following versions:
 
 | Version | Supported          |
 | ------- | ------------------ |
+| 1.5.x   | :white_check_mark: |
 | 1.4.x   | :white_check_mark: |
-| 1.3.x   | :x:                |
-| < 1.3   | :x:                |
+| < 1.4   | :x:                |
 
 ## Reporting a Vulnerability
 
@@ -51,5 +51,11 @@ Preferred reporting channels:
   untrusted pull-request data into shell commands.
 - Treat SARIF, JSON, JUnit, and GitLab reports as potentially sensitive even
   though findings are masked by default.
+- Review `allowlist` entries carefully. Exact values suppress matching findings;
+  SHA-256 fingerprints are preferred because they avoid storing the value in
+  configuration. Do not allowlist a live credential.
+- Recursive decoding is intentionally bounded to two layers and supports
+  URL-encoded, Base64/Base64URL, and hexadecimal content. Decoded findings
+  should be treated as exposed credentials and rotated.
 - Rotate exposed credentials immediately; removing a finding from a report does
   not remove it from Git history, logs, caches, or artifacts.

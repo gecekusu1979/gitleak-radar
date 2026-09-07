@@ -62,6 +62,7 @@ export interface ScanOptions {
   maxFileSize?: string | number;
   rulesPath?: string;
   baselinePath?: string;
+  allowlist?: string[];
   createBaseline?: boolean | string;
   onFileAction?: (filePath: string, status: "scanned" | "ignored" | "binary") => void;
 }

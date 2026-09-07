@@ -25,7 +25,10 @@ export class ProjectScanner {
     }
 
     const activeRules = await getEffectiveRules(config, extraRules);
-    const detector = new SecretDetector(activeRules);
+    const detector = new SecretDetector(activeRules, [
+      ...(config.allowlist ?? []),
+      ...(options.allowlist ?? [])
+    ]);
 
     const rawLimit = options.maxFileSize ?? config.maxFileSize;
     const maxFileSizeBytes = rawLimit !== undefined ? parseByteSize(rawLimit) : DEFAULT_MAX_FILE_SIZE_BYTES;
@@ -195,4 +198,3 @@ export async function scan(options: ScanOptions): Promise<ScanResult> {
   const scanner = new ProjectScanner();
   return scanner.scan(options);
 }
-

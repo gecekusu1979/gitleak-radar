@@ -4,7 +4,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/gitleak-radar.svg)](https://www.npmjs.com/package/gitleak-radar)
 
 [![CI](https://github.com/gecekusu1979/gitleak-radar/actions/workflows/gitleak-radar.yml/badge.svg)](https://github.com/gecekusu1979/gitleak-radar/actions)
-[![tests](https://img.shields.io/badge/tests-113%2F113%20passing-brightgreen)](https://github.com/gecekusu1979/gitleak-radar)
+[![tests](https://img.shields.io/badge/tests-135%2F135%20passing-brightgreen)](https://github.com/gecekusu1979/gitleak-radar)
 [![SARIF](https://img.shields.io/badge/SARIF-v2.1.0%20Compliant-blue.svg)]()
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict%20Mode-3178c6.svg)](https://www.typescriptlang.org/)
@@ -28,6 +28,8 @@ GitLeak Radar is designed as a local-first SAST tool for detecting API keys, acc
 - **Multi-Format Enterprise Reporting:** JUnit XML (`--junit`), GitLab Code Quality (`--gitlab`), and native GitHub Actions annotations (`--github-actions`) complement SARIF output.
 - **Incremental PR Scanning:** `--since <ref>` scans files changed since a commit, branch, or tag, including newly added untracked files.
 - **Baseline / Allowlist Management:** `--create-baseline` snapshots known findings and `--baseline` suppresses them in future scans using SHA-256 fingerprints.
+- **Recursive Decoding:** Bounded two-layer URL, Base64/Base64URL, and hexadecimal decoding catches secrets hidden behind common encoding steps without unbounded processing.
+- **Fingerprint Allowlisting:** Exact values or SHA-256 fingerprints can be allowlisted through `.gitleak-radar.json` or `--allowlist`; fingerprints avoid storing secret material in configuration.
 - **Inline False-Positive Suppression:** `// gitleak-radar:ignore` and `// gitleak-radar:ignore-next-line` can suppress all rules or selected rule IDs.
 - **Rule Explainer:** `gitleak-radar explain <rule-id>` displays pattern details, risk context, and remediation guidance.
 - **Configurable File Size Limits:** `--max-file-size` accepts byte values and human-readable units such as `5MB` and `500KB` across filesystem, staged, and history scans.
@@ -103,8 +105,8 @@ Baseline entries use SHA-256 fingerprints based on finding coordinates and rule 
 
 Use the composite action from a tagged release. Pinning the tag or commit is
 recommended for reproducible CI. The action release and the npm scanner
-release are versioned independently: `v1.4.8` runs the reviewed
-`gitleak-radar@1.4.9` package by default.
+release is synchronized at `v1.5.0`; the action runs the reviewed
+`gitleak-radar@1.5.0` package by default.
 
 ```yaml
 permissions:
@@ -116,9 +118,9 @@ steps:
     with:
       fetch-depth: 0
   - name: Scan for secrets
-    uses: gecekusu1979/gitleak-radar@v1.4.9
+    uses: gecekusu1979/gitleak-radar@v1.5.0
     with:
-      version: '1.4.9'
+      version: '1.5.0'
       upload-sarif: true
       upload-artifact: true
       fail-on-findings: true
@@ -149,7 +151,7 @@ during installation.
 | Input | Default | Purpose |
 | --- | --- | --- |
 | `path` | `.` | Directory to scan |
-| `version` | `1.4.9` | Exact npm scanner version |
+| `version` | `1.5.0` | Exact npm scanner version |
 | `severity` | `low` | Minimum finding severity |
 | `since` | empty | Scan changes since a Git ref |
 | `staged` | `false` | Scan staged Git index files |
@@ -329,6 +331,7 @@ Commands:
 | --- | --- | --- |
 | `-s, --severity <level>` | Minimum severity: `low`, `medium`, `high`, or `critical` | `low` |
 | `-i, --ignore <dirs...>` | Additional directory patterns to ignore | - |
+| `--allowlist <entries...>` | Suppress exact secret values or SHA-256 fingerprints | - |
 | `-r, --rules <file>` | Path to external custom rules JSON file | - |
 | `--max-file-size <size>` | Maximum file size, such as `5MB`, `500KB`, or bytes | `10MB` |
 | `--baseline <file>` | Suppress findings recorded in a baseline file | - |
@@ -355,6 +358,9 @@ gitleak-radar scan . --verbose
 
 # Ignore specific directories during a filesystem scan
 gitleak-radar scan . --ignore "fixtures" "temp-data"
+
+# Suppress known non-sensitive values (or use their SHA-256 fingerprints)
+gitleak-radar scan . --allowlist "example-token-value"
 
 # Scan full Git history using a streaming diff parser
 gitleak-radar scan . --history
@@ -391,6 +397,12 @@ All rules are defined in `src/detectors/rules.ts` and can be inspected with `git
 | `private-key` | `CRITICAL` | Private Key Block | PEM private key boundaries (`-----BEGIN ... PRIVATE KEY-----`) |
 | `slack-token` | `HIGH` | Slack Access Token | Slack user, bot, and app tokens (`xox[baprs]-...`) |
 | `google-api-key` | `HIGH` | Google API Key | Google Cloud and service keys starting with `AIza` |
+| `twilio-api-key` | `CRITICAL` | Twilio API Key | `SK`-prefixed 32-character hexadecimal identifiers |
+| `sendgrid-api-key` | `CRITICAL` | SendGrid API Key | Dot-delimited keys starting with `SG.` |
+| `npm-token` | `CRITICAL` | npm Access Token | Publish/read tokens starting with `npm_` (supply-chain risk) |
+| `pypi-token` | `CRITICAL` | PyPI API Token | Upload tokens starting with `pypi-AgEIcHlwaS5vcmc` (supply-chain risk) |
+| `digitalocean-token` | `CRITICAL` | DigitalOcean Personal Access Token | Tokens starting with `dop_v1_` |
+| `discord-webhook` | `HIGH` | Discord Webhook | Published `discord.com/api/webhooks/...` URLs |
 | `generic-api-key` | `MEDIUM` | Generic API Secret | Quoted or unquoted assignments validated with $H(X) \ge 3.0$ entropy |
 | `generic-bearer-token` | `HIGH` | Generic Bearer Token | Bearer authorization tokens (minimum 20 characters) |
 | `generic-password` | `MEDIUM` | Generic Password Assignment | Hardcoded passwords in source code or `.env` configurations |
@@ -404,11 +416,19 @@ To configure path exclusions or toggle specific rules, add an optional `.gitleak
   "ignore": [
     "docs/**"
   ],
+  "allowlist": [
+    "example-token-value",
+    "<sha256-fingerprint>"
+  ],
   "rules": {
     "generic-api-key": false
   }
 }
 ```
+
+`allowlist` entries are exact extracted values or SHA-256 fingerprints. They apply to direct and recursively decoded findings. Prefer fingerprints when an exact secret value must not be stored in configuration. Values are matched only after a detector rule has identified them.
+
+The detector also checks bounded recursive decoding (up to two layers) for URL-encoded, Base64/Base64URL, and hexadecimal content. Decoded values are masked in reports like ordinary findings; the original source content is never written to reports.
 
 ### Custom Rules
 
@@ -509,8 +529,11 @@ pnpm install
 # Run TypeScript typechecks
 pnpm typecheck
 
-# Run the Vitest test suite (113 automated tests)
+# Run the Vitest test suite (135 automated tests)
 pnpm test
+
+# Run the test suite with coverage
+pnpm test:coverage
 
 # Build the production bundle
 pnpm build
@@ -518,6 +541,22 @@ pnpm build
 # Test package artifacts without publishing
 npm pack --dry-run
 ```
+
+### Test Coverage
+
+Snapshot from `pnpm test:coverage` (v8 provider):
+
+| Scope | Stmts | Branch | Funcs |
+| --- | --- | --- | --- |
+| All files | 76.18% | 75.70% | 92.72% |
+| `src/detectors` | 94.18% | 87.20% | 100% |
+| `src/scanner` | 90.15% | 74.54% | 100% |
+| `src/git` | 89.61% | 59.45% | 100% |
+| `src/scoring` | 97.95% | 78.57% | 100% |
+| `src/config` | 74.48% | 77.58% | 100% |
+| `src/hooks` | 89.09% | 88.88% | 100% |
+
+Note: `src/cli/index.ts` and `src/reporters/terminal.ts` report 0% in this table because they are only exercised through the compiled CLI in a separate OS process (`tests/cli/*.test.ts` via `execFile`) — v8's in-process coverage provider cannot instrument a spawned child process, so this understates real behavioral coverage.
 
 ## Why GitLeak Radar?
 

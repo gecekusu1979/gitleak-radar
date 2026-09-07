@@ -99,6 +99,7 @@ export async function compileCustomRule(def: CustomRuleDefinition): Promise<Dete
 
 export const ConfigSchema = z.object({
   ignore: z.array(z.string()).default([]),
+  allowlist: z.array(z.string()).default([]),
   rules: z.record(z.enum(VALID_RULE_IDS), z.boolean()).default({}),
   customRules: z.array(CustomRuleSchema).default([]),
   maxFileSize: z.union([z.string(), z.number()]).optional()
@@ -108,6 +109,7 @@ export type RadarConfig = z.infer<typeof ConfigSchema>;
 
 const DEFAULT_CONFIG: RadarConfig = {
   ignore: [],
+  allowlist: [],
   rules: {},
   customRules: []
 };

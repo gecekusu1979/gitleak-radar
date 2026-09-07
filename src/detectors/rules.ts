@@ -106,6 +106,54 @@ export const DETECTION_RULES: DetectionRule[] = [
     keywords: ["mongodb", "postgres", "mysql"]
   },
   {
+    id: "twilio-api-key",
+    name: "Twilio API Key",
+    description: "Identifies Twilio API Key SIDs",
+    severity: "critical",
+    pattern: /\b(SK[0-9a-fA-F]{32})\b/g,
+    keywords: ["sk"]
+  },
+  {
+    id: "sendgrid-api-key",
+    name: "SendGrid API Key",
+    description: "Identifies SendGrid API keys used for transactional email sending",
+    severity: "critical",
+    pattern: /\b(SG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43})\b/g,
+    keywords: ["sg."]
+  },
+  {
+    id: "npm-token",
+    name: "npm Access Token",
+    description: "Identifies npm registry publish/read tokens (supply-chain risk)",
+    severity: "critical",
+    pattern: /\b(npm_[A-Za-z0-9]{36})\b/g,
+    keywords: ["npm_"]
+  },
+  {
+    id: "pypi-token",
+    name: "PyPI API Token",
+    description: "Identifies PyPI upload tokens (supply-chain risk)",
+    severity: "critical",
+    pattern: /\b(pypi-AgEIcHlwaS5vcmc[A-Za-z0-9_-]{50,})\b/g,
+    keywords: ["pypi-ageichlwas"]
+  },
+  {
+    id: "digitalocean-token",
+    name: "DigitalOcean Personal Access Token",
+    description: "Identifies DigitalOcean API personal access tokens",
+    severity: "critical",
+    pattern: /\b(dop_v1_[a-f0-9]{64})\b/g,
+    keywords: ["dop_v1_"]
+  },
+  {
+    id: "discord-webhook",
+    name: "Discord Webhook",
+    description: "Identifies published Discord webhook URLs",
+    severity: "high",
+    pattern: /(https:\/\/discord(?:app)?\.com\/api\/webhooks\/\d+\/[A-Za-z0-9_-]+)/g,
+    keywords: ["discord.com/api/webhooks", "discordapp.com/api/webhooks"]
+  },
+  {
     id: "generic-api-key",
     name: "Generic API Key",
     description: "Identifies assignments of high-entropy strings to api_key variables",
@@ -132,4 +180,3 @@ export const DETECTION_RULES: DetectionRule[] = [
     keywords: ["password", "passwd", "pwd"]
   }
 ];
-

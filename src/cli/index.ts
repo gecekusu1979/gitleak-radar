@@ -45,6 +45,7 @@ program
   .argument("[path]", "Target directory path to scan", ".")
   .option("-s, --severity <level>", "Minimum severity threshold (low, medium, high, critical)", "low")
   .option("-i, --ignore <dirs...>", "Additional directories to ignore")
+  .option("--allowlist <entries...>", "Exact secret values or SHA-256 fingerprints to suppress")
   .option("-r, --rules <file>", "Path to custom rules JSON file")
   .option("--max-file-size <size>", "Maximum file size limit to scan (e.g. 5MB, 500KB, 10485760)")
   .option("--baseline <file>", "Path to baseline file to suppress known findings")
@@ -64,6 +65,7 @@ program
       options: {
         severity: string;
         ignore?: string[];
+        allowlist?: string[];
         rules?: string;
         maxFileSize?: string;
         baseline?: string;
@@ -111,6 +113,7 @@ program
           severity: options.severity as Severity,
           json: options.json,
           ignore: options.ignore,
+          allowlist: options.allowlist,
           rulesPath: options.rules,
           maxFileSize: options.maxFileSize,
           baselinePath: options.baseline,

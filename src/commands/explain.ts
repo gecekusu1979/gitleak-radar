@@ -29,6 +29,36 @@ const REMEDIATION_GUIDES: Record<string, string[]> = {
     "Assume any system authenticating with this key is compromised. Revoke public keys from authorized_keys / servers.",
     "Generate a new cryptographic key pair using strong parameters (e.g. Ed25519 or RSA >= 3072 bits).",
     "Never store private keys directly in source code repositories."
+  ],
+  "twilio-api-key": [
+    "Delete the exposed API Key in the Twilio Console under Account -> API keys & tokens.",
+    "Review usage logs for unauthorized calls, SMS sends, or billing charges.",
+    "Store Twilio credentials in environment variables or a secrets manager, never in source."
+  ],
+  "sendgrid-api-key": [
+    "Revoke the key immediately in the SendGrid dashboard under Settings -> API Keys.",
+    "Check Activity Feed for unexpected sends that could indicate spam/phishing abuse.",
+    "Scope replacement keys to only the permissions the integration actually needs."
+  ],
+  "npm-token": [
+    "Revoke the token immediately at npmjs.com under Access Tokens.",
+    "Audit recently published versions of any packages this token could publish to for tampering (supply-chain risk).",
+    "Use scoped, automation-specific tokens with the minimum required permission (read-only where possible)."
+  ],
+  "pypi-token": [
+    "Revoke the token immediately at pypi.org under Account settings -> API tokens.",
+    "Audit recently published package versions for unauthorized releases (supply-chain risk).",
+    "Scope future tokens to a single project instead of the full account."
+  ],
+  "digitalocean-token": [
+    "Revoke the token immediately in the DigitalOcean control panel under API -> Personal access tokens.",
+    "Review account activity for unauthorized droplets, DNS changes, or billing charges.",
+    "Prefer scoped tokens and rotate them regularly."
+  ],
+  "discord-webhook": [
+    "Delete or regenerate the webhook in the Discord channel/server settings immediately.",
+    "Check the channel for spam or unexpected messages sent through the exposed webhook.",
+    "Treat webhook URLs as secrets; never commit them to a public repository."
   ]
 };
 
