@@ -112,7 +112,7 @@ permissions:
 steps:
   - uses: actions/checkout@v4
   - name: Scan for secrets
-    uses: gecekusu1979/gitleak-radar@v1.4.0
+    uses: gecekusu1979/gitleak-radar@v1.4.6
     with:
       upload-sarif: true
       fail-on-findings: true
@@ -480,7 +480,7 @@ npm pack --dry-run
 
 ## Roadmap
 
-### Completed in v1.4.0
+### Completed in v1.4.6
 
 - [x] Custom user-defined regex and entropy rules via `.gitleak-radar.json` and `--rules`
 - [x] CLI configuration bootstrapping (`gitleak-radar init`)
