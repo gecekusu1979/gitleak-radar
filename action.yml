@@ -1,5 +1,5 @@
 ﻿name: 'GitLeak Radar'
-description: 'Scan source code, staged changes, and Git history for leaked secrets in local and CI workflows.'
+description: 'Scan repositories for leaked secrets.'
 author: 'gecekusu1979'
 
 branding:
