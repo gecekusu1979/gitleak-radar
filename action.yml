@@ -1,6 +1,6 @@
-﻿name: 'GitLeak Radar'
-description: 'Scan repositories for leaked secrets.'
-author: 'gecekusu1979'
+name: GitLeak Radar
+description: Scan repositories for leaked secrets
+author: gecekusu1979
 
 branding:
   icon: 'shield'
