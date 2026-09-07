@@ -1,4 +1,5 @@
-﻿import fs from "node:fs/promises";
+﻿import { runRegexWithTimeout } from "../detectors/regex-runner.js";
+import fs from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
 import { DETECTION_RULES } from "../detectors/rules.js";
@@ -47,6 +48,18 @@ function assertRegexIsSafe(source: string, ruleId: string): void {
     throw new Error(
       `Custom rule "${ruleId}" rejected: Regex contains dangerous nested quantifiers (e.g., (a+)+) susceptible to catastrophic backtracking (ReDoS). Simplify the pattern.`
     );
+  }
+}
+
+export async function validateCustomRegexWorker(pattern: string, flags: string, ruleId: string): Promise<void> {
+  // Backtracking tetikleyecek tipik evil payload ile worker-thread timeout kontrolü
+  const probePayload = "a".repeat(40) + "!";
+  try {
+    await runRegexWithTimeout(pattern, flags, probePayload, 250);
+  } catch (err: any) {
+    if (err.message && err.message.includes("ReDoS protection")) {
+      throw new Error(`Custom rule "${ruleId}" rejected: Execution exceeded 250ms timeout during ReDoS safety check.`);
+    }
   }
 }
 
