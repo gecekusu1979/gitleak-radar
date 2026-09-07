@@ -9,29 +9,31 @@ export interface RegexMatchResult {
 }
 
 const WORKER_SCRIPT = `
-  const { parentPort, workerData } = require("node:worker_threads");
-  const { pattern, flags, text } = workerData;
-  try {
-    const regex = new RegExp(pattern, flags);
-    const matches = [];
+  (async () => {
+    const { parentPort, workerData } = await import("node:worker_threads");
+    const { pattern, flags, text } = workerData;
+    try {
+      const regex = new RegExp(pattern, flags);
+      const matches = [];
 
-    if (regex.global) {
-      let m;
-      while ((m = regex.exec(text)) !== null) {
-        matches.push({ value: m[0], index: m.index });
-        if (m.index === regex.lastIndex) regex.lastIndex++;
+      if (regex.global) {
+        let m;
+        while ((m = regex.exec(text)) !== null) {
+          matches.push({ value: m[0], index: m.index });
+          if (m.index === regex.lastIndex) regex.lastIndex++;
+        }
+      } else {
+        const m = regex.exec(text);
+        if (m) {
+          matches.push({ value: m[0], index: m.index });
+        }
       }
-    } else {
-      const m = regex.exec(text);
-      if (m) {
-        matches.push({ value: m[0], index: m.index });
-      }
+
+      parentPort.postMessage({ success: true, matched: matches.length > 0, matches });
+    } catch (err) {
+      parentPort.postMessage({ success: false, error: err.message });
     }
-
-    parentPort.postMessage({ success: true, matched: matches.length > 0, matches });
-  } catch (err) {
-    parentPort.postMessage({ success: false, error: err.message });
-  }
+  })();
 `;
 
 export function runRegexWithTimeout(
@@ -76,6 +78,16 @@ export function runRegexWithTimeout(
         isSettled = true;
         clearTimeout(timer);
         reject(err);
+      }
+    });
+
+    worker.on("exit", (code) => {
+      if (!isSettled) {
+        isSettled = true;
+        clearTimeout(timer);
+        if (code !== 0) {
+          reject(new Error(`Worker stopped with exit code ${code}`));
+        }
       }
     });
   });

@@ -35,7 +35,7 @@ const REMEDIATION_GUIDES: Record<string, string[]> = {
 export async function explainRule(ruleId: string, targetPath: string = "."): Promise<void> {
   const targetDir = path.resolve(process.cwd(), targetPath);
   const config = await loadConfig(targetDir);
-  const allRules: DetectionRule[] = getEffectiveRules(config);
+  const allRules: DetectionRule[] = await getEffectiveRules(config);
 
   const matched = allRules.find((r) => r.id.toLowerCase() === ruleId.toLowerCase());
 
@@ -91,3 +91,4 @@ function formatSeverity(severity: string): string {
       return severity;
   }
 }
+

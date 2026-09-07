@@ -63,18 +63,24 @@ export async function validateCustomRegexWorker(pattern: string, flags: string, 
   }
 }
 
-export function compileCustomRule(def: CustomRuleDefinition): DetectionRule {
+export async function compileCustomRule(def: CustomRuleDefinition): Promise<DetectionRule> {
   let pattern: RegExp;
+  let rawPattern: string;
+  let flags: string;
+
   try {
     const slashMatch = def.regex.match(/^\/(.+)\/([a-z]*)$/i);
     if (slashMatch && slashMatch[1]) {
-      assertRegexIsSafe(slashMatch[1], def.id);
-      const flags = slashMatch[2]?.includes("g") ? slashMatch[2] : (slashMatch[2] || "") + "g";
-      pattern = new RegExp(slashMatch[1], flags);
+      rawPattern = slashMatch[1];
+      flags = slashMatch[2]?.includes("g") ? slashMatch[2] : (slashMatch[2] || "") + "g";
     } else {
-      assertRegexIsSafe(def.regex, def.id);
-      pattern = new RegExp(def.regex, "g");
+      rawPattern = def.regex;
+      flags = "g";
     }
+
+    assertRegexIsSafe(rawPattern, def.id);
+    await validateCustomRegexWorker(rawPattern, flags, def.id);
+    pattern = new RegExp(rawPattern, flags);
   } catch (err: any) {
     throw new Error(`Invalid regex in custom rule "${def.id}": ${err.message}`);
   }
@@ -149,7 +155,7 @@ export async function loadExternalRulesFile(filePath: string): Promise<Detection
     throw new Error(`Rules file "${filePath}" must contain a JSON array or object.`);
   }
 
-  return ruleDefs.map(compileCustomRule);
+  return Promise.all(ruleDefs.map(compileCustomRule));
 }
 
 export async function loadConfig(targetDir: string): Promise<RadarConfig> {
@@ -195,7 +201,7 @@ export async function loadConfig(targetDir: string): Promise<RadarConfig> {
   }
 }
 
-export function getEffectiveRules(config: RadarConfig, extraRules: DetectionRule[] = []): DetectionRule[] {
+export async function getEffectiveRules(config: RadarConfig, extraRules: DetectionRule[] = []): Promise<DetectionRule[]> {
   const ruleMap = new Map<string, DetectionRule>();
 
   // 1. Yerleşik kuralları temel olarak ekle
@@ -204,7 +210,7 @@ export function getEffectiveRules(config: RadarConfig, extraRules: DetectionRule
   }
 
   // 2. Config customRules kuralları yerleşik kuralların üzerine yazar (override)
-  const configCustomRules = (config.customRules || []).map(compileCustomRule);
+  const configCustomRules = await Promise.all((config.customRules || []).map(compileCustomRule));
   for (const rule of configCustomRules) {
     ruleMap.set(rule.id, rule);
   }
