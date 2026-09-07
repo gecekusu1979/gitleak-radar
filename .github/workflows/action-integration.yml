@@ -21,7 +21,7 @@ jobs:
         id: scan
         uses: ./
         with:
-          version: '1.4.1'
+          version: '1.4.8'
           upload-sarif: false
           upload-artifact: true
           artifact-name: integration-sarif
