@@ -48,6 +48,7 @@ program
   .option("--allowlist <entries...>", "Exact secret values or SHA-256 fingerprints to suppress")
   .option("-r, --rules <file>", "Path to custom rules JSON file")
   .option("--max-file-size <size>", "Maximum file size limit to scan (e.g. 5MB, 500KB, 10485760)")
+  .option("--max-decode-depth <n>", "Recursively decode Base64/Base64URL, hex, and URL-encoded content up to N layers (default: 2, use 0 to disable)")
   .option("--baseline <file>", "Path to baseline file to suppress known findings")
   .option("--create-baseline [file]", "Generate a baseline file of current findings and exit")
   .option("-v, --verbose", "Show verbose scanning and file filter details")
@@ -68,6 +69,7 @@ program
         allowlist?: string[];
         rules?: string;
         maxFileSize?: string;
+        maxDecodeDepth?: string;
         baseline?: string;
         createBaseline?: boolean | string;
         verbose?: boolean;
@@ -87,6 +89,17 @@ program
           chalk.red(`Error: Invalid severity "${options.severity}". Valid options are: ${validSeverities.join(", ")}`)
         );
         process.exit(2);
+      }
+
+      let maxDecodeDepth: number | undefined;
+      if (options.maxDecodeDepth !== undefined) {
+        maxDecodeDepth = Number.parseInt(options.maxDecodeDepth, 10);
+        if (Number.isNaN(maxDecodeDepth) || maxDecodeDepth < 0 || maxDecodeDepth > 10) {
+          console.error(
+            chalk.red(`Error: Invalid --max-decode-depth "${options.maxDecodeDepth}". Must be an integer between 0 and 10.`)
+          );
+          process.exit(2);
+        }
       }
 
       const activeModes = [
@@ -116,6 +129,7 @@ program
           allowlist: options.allowlist,
           rulesPath: options.rules,
           maxFileSize: options.maxFileSize,
+          maxDecodeDepth,
           baselinePath: options.baseline,
           createBaseline: options.createBaseline,
           verbose: options.verbose,

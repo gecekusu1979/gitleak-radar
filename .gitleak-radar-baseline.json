@@ -1,0 +1,109 @@
+{
+  "version": "1.0",
+  "createdAt": "2026-09-10T23:46:17.970Z",
+  "totalFindings": 17,
+  "entries": [
+    {
+      "fingerprint": "f62298c5c8b686dd8941dfdd29aca3201523183171602d261a0724a6f1972c29",
+      "ruleId": "aws-access-key",
+      "file": "gitleak-radar-decode-fixes.patch",
+      "line": 307
+    },
+    {
+      "fingerprint": "f62298c5c8b686dd8941dfdd29aca3201523183171602d261a0724a6f1972c29",
+      "ruleId": "aws-access-key",
+      "file": "gitleak-radar-decode-fixes.patch",
+      "line": 317
+    },
+    {
+      "fingerprint": "f62298c5c8b686dd8941dfdd29aca3201523183171602d261a0724a6f1972c29",
+      "ruleId": "aws-access-key",
+      "file": "gitleak-radar-decode-fixes.patch",
+      "line": 337
+    },
+    {
+      "fingerprint": "f62298c5c8b686dd8941dfdd29aca3201523183171602d261a0724a6f1972c29",
+      "ruleId": "aws-access-key",
+      "file": "gitleak-radar-decode-fixes.patch",
+      "line": 342
+    },
+    {
+      "fingerprint": "f62298c5c8b686dd8941dfdd29aca3201523183171602d261a0724a6f1972c29",
+      "ruleId": "aws-access-key",
+      "file": "gitleak-radar-decode-fixes.patch",
+      "line": 346
+    },
+    {
+      "fingerprint": "f62298c5c8b686dd8941dfdd29aca3201523183171602d261a0724a6f1972c29",
+      "ruleId": "aws-access-key",
+      "file": "gitleak-radar-decode-fixes.patch",
+      "line": 350
+    },
+    {
+      "fingerprint": "f62298c5c8b686dd8941dfdd29aca3201523183171602d261a0724a6f1972c29",
+      "ruleId": "aws-access-key",
+      "file": "gitleak-radar-decode-fixes.patch",
+      "line": 354
+    },
+    {
+      "fingerprint": "f62298c5c8b686dd8941dfdd29aca3201523183171602d261a0724a6f1972c29",
+      "ruleId": "aws-access-key",
+      "file": "gitleak-radar-decode-fixes.patch",
+      "line": 358
+    },
+    {
+      "fingerprint": "f62298c5c8b686dd8941dfdd29aca3201523183171602d261a0724a6f1972c29",
+      "ruleId": "aws-access-key",
+      "file": "gitleak-radar-decode-fixes.patch",
+      "line": 364
+    },
+    {
+      "fingerprint": "f62298c5c8b686dd8941dfdd29aca3201523183171602d261a0724a6f1972c29",
+      "ruleId": "aws-access-key",
+      "file": "gitleak-radar-decode-fixes.patch",
+      "line": 369
+    },
+    {
+      "fingerprint": "f62298c5c8b686dd8941dfdd29aca3201523183171602d261a0724a6f1972c29",
+      "ruleId": "aws-access-key",
+      "file": "gitleak-radar-decode-fixes.patch",
+      "line": 374
+    },
+    {
+      "fingerprint": "f62298c5c8b686dd8941dfdd29aca3201523183171602d261a0724a6f1972c29",
+      "ruleId": "aws-access-key",
+      "file": "gitleak-radar-decode-fixes.patch",
+      "line": 380
+    },
+    {
+      "fingerprint": "f62298c5c8b686dd8941dfdd29aca3201523183171602d261a0724a6f1972c29",
+      "ruleId": "aws-access-key",
+      "file": "gitleak-radar-decode-fixes.patch",
+      "line": 396
+    },
+    {
+      "fingerprint": "f62298c5c8b686dd8941dfdd29aca3201523183171602d261a0724a6f1972c29",
+      "ruleId": "aws-access-key",
+      "file": "gitleak-radar-decode-fixes.patch",
+      "line": 406
+    },
+    {
+      "fingerprint": "f62298c5c8b686dd8941dfdd29aca3201523183171602d261a0724a6f1972c29",
+      "ruleId": "aws-access-key",
+      "file": "gitleak-radar-decode-fixes.patch",
+      "line": 415
+    },
+    {
+      "fingerprint": "c48dc5b854c7631642faa21f5f6c70e58d1a0c72a00510f56c4eba77ec21dcc0",
+      "ruleId": "generic-password",
+      "file": "gitleak-radar-improvements.patch",
+      "line": 1307
+    },
+    {
+      "fingerprint": "77e0bddfd95da609ecef6850231a8a9f41ae6bd1254c9777faa40940e845c367",
+      "ruleId": "generic-password",
+      "file": "gitleak-radar-improvements2.patch",
+      "line": 1307
+    }
+  ]
+}

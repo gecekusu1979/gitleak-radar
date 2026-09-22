@@ -29,3 +29,6 @@ yarn-debug.log*
 
 # GitLeak Radar Local Config (opsiyonel)
 # .gitleak-radar.json
+
+# Ignore patch files used for testing and distribution
+*.patch

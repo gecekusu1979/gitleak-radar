@@ -3,17 +3,19 @@ import { type DetectionRule, type Finding, type Severity, SeverityOrder } from "
 import { isPlaceholderOrExample } from "../scanner/file-filter.js";
 import { calculateShannonEntropy, isHighEntropyToken } from "./entropy.js";
 import { isLineIgnoredByDirective } from "./inline-ignore.js";
-import { recursivelyDecodeLine } from "./decoder.js";
+import { recursivelyDecodeLine, DEFAULT_MAX_DECODE_DEPTH } from "./decoder.js";
 
 export const MAX_LINE_LENGTH = 8192;
 
 export class SecretDetector {
   private rules: DetectionRule[];
   private allowlist: ReadonlySet<string>;
+  private maxDecodeDepth: number;
 
-  constructor(rules: DetectionRule[], allowlist: string[] = []) {
+  constructor(rules: DetectionRule[], allowlist: string[] = [], maxDecodeDepth: number = DEFAULT_MAX_DECODE_DEPTH) {
     this.rules = rules;
     this.allowlist = new Set(allowlist.map((value) => value.trim()).filter(Boolean));
+    this.maxDecodeDepth = maxDecodeDepth;
   }
 
   public mask(secret: string): string {
@@ -25,44 +27,23 @@ export class SecretDetector {
     return `${prefix}${"*".repeat(secret.length - 4)}${suffix}`;
   }
 
-  public scanLine(
-    line: string,
-    lineNumber: number,
-    filePath: string,
-    minSeverity: Severity = "low",
-    previousLine?: string
-  ): Finding[] {
-    const findings: Finding[] = [];
-    const targetLine = line.length > MAX_LINE_LENGTH ? line.slice(0, MAX_LINE_LENGTH) : line;
-    const lowerLine = targetLine.toLowerCase();
-    const minSeverityWeight = SeverityOrder[minSeverity];
-
-    if (isLineIgnoredByDirective(targetLine, previousLine)) {
-      return [];
-    }
-
-    this.scanText(targetLine, lineNumber, filePath, minSeverity, previousLine, 0, 0, findings);
-
-    for (const candidate of recursivelyDecodeLine(targetLine)) {
-      this.scanText(candidate.text, lineNumber, filePath, minSeverity, undefined, candidate.offset, 0, findings);
-    }
-
-    return findings.filter((finding, index, all) =>
-      all.findIndex((other) => other.ruleId === finding.ruleId && other.secretHash === finding.secretHash) === index
-    );
+  private isAllowlisted(secret: string): boolean {
+    if (this.allowlist.size === 0) return false;
+    if (this.allowlist.has(secret)) return true;
+    const hash = crypto.createHash("sha256").update(secret).digest("hex");
+    return this.allowlist.has(hash);
   }
 
   private scanText(
-    targetLine: string,
+    text: string,
     lineNumber: number,
     filePath: string,
     minSeverity: Severity,
     previousLine: string | undefined,
-    columnOffset: number,
-    _depth: number,
+    colOffset: number,
     findings: Finding[]
   ): void {
-    const lowerLine = targetLine.toLowerCase();
+    const lowerText = text.toLowerCase();
     const minSeverityWeight = SeverityOrder[minSeverity];
 
     for (const rule of this.rules) {
@@ -70,12 +51,12 @@ export class SecretDetector {
         continue;
       }
 
-      if (isLineIgnoredByDirective(targetLine, previousLine, rule.id)) {
+      if (isLineIgnoredByDirective(text, previousLine, rule.id)) {
         continue;
       }
 
       if (rule.keywords && rule.keywords.length > 0) {
-        const matchesKeyword = rule.keywords.some((kw) => lowerLine.includes(kw.toLowerCase()));
+        const matchesKeyword = rule.keywords.some((kw) => lowerText.includes(kw.toLowerCase()));
         if (!matchesKeyword) {
           continue;
         }
@@ -84,25 +65,23 @@ export class SecretDetector {
       rule.pattern.lastIndex = 0;
       let match: RegExpExecArray | null;
 
-      while ((match = rule.pattern.exec(targetLine)) !== null) {
+      while ((match = rule.pattern.exec(text)) !== null) {
         const rawSecret = match[1] || match[0];
 
-        const secretHash = crypto.createHash("sha256").update(rawSecret).digest("hex");
-        if (this.allowlist.has(rawSecret) || this.allowlist.has(secretHash)) {
-          continue;
-        }
-        if (isPlaceholderOrExample(rawSecret, targetLine, filePath)) {
+        if (isPlaceholderOrExample(rawSecret, text, filePath)) {
           continue;
         }
 
-        // 1. Dinamik karakter kumesi tabanli entropi denetimi
+        if (this.isAllowlisted(rawSecret)) {
+          continue;
+        }
+
         if (rule.requiresEntropy) {
           if (!isHighEntropyToken(rawSecret)) {
             continue;
           }
         }
 
-        // 2. Kurala ozel tanimlanmis mutlak Shannon entropi esigi
         if (typeof rule.minEntropy === "number") {
           const tokenEntropy = calculateShannonEntropy(rawSecret);
           if (tokenEntropy < rule.minEntropy) {
@@ -112,7 +91,7 @@ export class SecretDetector {
 
         const matchIndex = match.index;
         const secretSubIndex = match[0].indexOf(rawSecret);
-        const column = columnOffset + matchIndex + (secretSubIndex !== -1 ? secretSubIndex : 0) + 1;
+        const column = colOffset + matchIndex + (secretSubIndex !== -1 ? secretSubIndex : 0) + 1;
 
         findings.push({
           ruleId: rule.id,
@@ -122,7 +101,7 @@ export class SecretDetector {
           line: lineNumber,
           column,
           maskedValue: this.mask(rawSecret),
-          secretHash
+          secretHash: crypto.createHash("sha256").update(rawSecret).digest("hex")
         });
 
         if (!rule.pattern.global) {
@@ -130,6 +109,30 @@ export class SecretDetector {
         }
       }
     }
+  }
 
+  public scanLine(
+    line: string,
+    lineNumber: number,
+    filePath: string,
+    minSeverity: Severity = "low",
+    previousLine?: string
+  ): Finding[] {
+    const findings: Finding[] = [];
+    const targetLine = line.length > MAX_LINE_LENGTH ? line.slice(0, MAX_LINE_LENGTH) : line;
+
+    if (isLineIgnoredByDirective(targetLine, previousLine)) {
+      return [];
+    }
+
+    // Doğrudan tarama
+    this.scanText(targetLine, lineNumber, filePath, minSeverity, previousLine, 0, findings);
+
+    // Encode edilmiş içerikleri çözerek tarama
+    for (const candidate of recursivelyDecodeLine(targetLine, this.maxDecodeDepth)) {
+      this.scanText(candidate.text, lineNumber, filePath, minSeverity, undefined, candidate.offset, findings);
+    }
+
+    return findings;
   }
 }

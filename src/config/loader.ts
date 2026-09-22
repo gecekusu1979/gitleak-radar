@@ -102,7 +102,8 @@ export const ConfigSchema = z.object({
   allowlist: z.array(z.string()).default([]),
   rules: z.record(z.enum(VALID_RULE_IDS), z.boolean()).default({}),
   customRules: z.array(CustomRuleSchema).default([]),
-  maxFileSize: z.union([z.string(), z.number()]).optional()
+  maxFileSize: z.union([z.string(), z.number()]).optional(),
+  maxDecodeDepth: z.number().int().min(0).max(10).optional()
 });
 
 export type RadarConfig = z.infer<typeof ConfigSchema>;

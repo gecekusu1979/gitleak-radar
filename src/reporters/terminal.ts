@@ -9,7 +9,7 @@ const SEVERITY_BADGES: Record<Severity, string> = {
 };
 
 export function renderTerminalReport(result: ScanResult, targetPath: string): void {
-  console.log("\n" + chalk.bold.cyan("GitLeak Radar"));
+  console.log("\n" + chalk.bold.cyan("🕵️ GitLeak Radar"));
   console.log(chalk.gray("────────────────────────────────────────"));
   console.log(`Scanning ${chalk.yellow(targetPath)}...\n`);
   console.log(`${chalk.green("✓")} Scanned ${chalk.bold(result.summary.filesScanned)} files`);
