@@ -21,7 +21,8 @@ export async function scanGitHistory(
   ignorePatterns: string[] = [],
   maxCommits?: number,
   onProgress?: (filePath: string, status: "scanned" | "ignored" | "binary") => void,
-  maxDiffBytesPerFile: number = DEFAULT_MAX_FILE_SIZE_BYTES
+  maxDiffBytesPerFile: number = DEFAULT_MAX_FILE_SIZE_BYTES,
+  specificFile?: string
 ): Promise<HistoryScanResult> {
   return new Promise((resolve, reject) => {
     const gitArgs = [
@@ -41,6 +42,9 @@ export async function scanGitHistory(
     }
 
     gitArgs.push("--");
+    if (specificFile) {
+      gitArgs.push(specificFile);
+    }
 
     const child = spawn("git", gitArgs, {
       cwd: repoPath,

@@ -93,8 +93,14 @@ program
 
       let maxDecodeDepth: number | undefined;
       if (options.maxDecodeDepth !== undefined) {
+        if (!/^(0|[1-9]\d*)$/.test(options.maxDecodeDepth)) {
+          console.error(
+            chalk.red(`Error: Invalid --max-decode-depth "${options.maxDecodeDepth}". Must be an integer between 0 and 10.`)
+          );
+          process.exit(2);
+        }
         maxDecodeDepth = Number.parseInt(options.maxDecodeDepth, 10);
-        if (Number.isNaN(maxDecodeDepth) || maxDecodeDepth < 0 || maxDecodeDepth > 10) {
+        if (maxDecodeDepth < 0 || maxDecodeDepth > 10) {
           console.error(
             chalk.red(`Error: Invalid --max-decode-depth "${options.maxDecodeDepth}". Must be an integer between 0 and 10.`)
           );

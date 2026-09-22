@@ -15,9 +15,27 @@ import { saveBaseline, loadBaselineFingerprints, filterFindingsByBaseline } from
 export class ProjectScanner {
   public async scan(options: ScanOptions): Promise<ScanResult> {
     const startTime = performance.now();
-    const targetDir = path.resolve(process.cwd(), options.path);
+    const absoluteScanPath = path.resolve(process.cwd(), options.path);
+    let targetConfigDir = absoluteScanPath;
+    let isFileScan = false;
 
-    const config = await loadConfig(targetDir);
+    try {
+      const lstats = await fs.promises.lstat(absoluteScanPath);
+      if (lstats.isSymbolicLink()) {
+        throw new Error(`Invalid scan path: "${options.path}" is a symbolic link. Please provide a direct file or directory path.`);
+      }
+      if (lstats.isFile()) {
+        isFileScan = true;
+        targetConfigDir = path.dirname(absoluteScanPath);
+      }
+    } catch (err: any) {
+      if (err.code === "ENOENT") {
+        throw new Error(`Invalid scan path: "${options.path}" does not exist.`);
+      }
+      throw err;
+    }
+
+    const config = await loadConfig(targetConfigDir);
 
     let extraRules: DetectionRule[] = [];
     if (options.rulesPath) {
@@ -41,7 +59,7 @@ export class ProjectScanner {
     let commitsScannedCount: number | undefined;
 
     if (options.history) {
-      const isRepo = await isInsideGitRepo(targetDir);
+      const isRepo = await isInsideGitRepo(targetConfigDir);
       if (!isRepo) {
         throw new Error("Cannot run --history scan: Specified path is not inside a Git repository.");
       }
@@ -52,13 +70,14 @@ export class ProjectScanner {
       ];
 
       const historyResult = await scanGitHistory(
-        targetDir,
+        targetConfigDir,
         detector,
         options.severity ?? "low",
         mergedIgnores,
         options.maxCommits,
         options.onFileAction,
-        maxFileSizeBytes
+        maxFileSizeBytes,
+        isFileScan ? absoluteScanPath : undefined
       );
 
       rawFindings = historyResult.findings;
@@ -67,7 +86,7 @@ export class ProjectScanner {
       commitsScannedCount = historyResult.totalCommits;
     } else {
       if (options.staged || options.since) {
-        const isRepo = await isInsideGitRepo(targetDir);
+        const isRepo = await isInsideGitRepo(targetConfigDir);
         if (!isRepo) {
           throw new Error(`Cannot run ${options.staged ? "--staged" : "--since"} scan: Specified path is not inside a Git repository.`);
         }
@@ -76,23 +95,35 @@ export class ProjectScanner {
       let candidateFiles: string[] = [];
 
       if (options.staged) {
-        candidateFiles = await getStagedFiles(targetDir);
+        candidateFiles = await getStagedFiles(targetConfigDir);
+        if (isFileScan) {
+          const expectedRel = path.relative(targetConfigDir, absoluteScanPath).replace(/\\/g, "/");
+          candidateFiles = candidateFiles.filter(f => f === expectedRel);
+        }
       } else if (options.since) {
-        candidateFiles = await getChangedFilesSince(targetDir, options.since);
+        candidateFiles = await getChangedFilesSince(targetConfigDir, options.since);
+        if (isFileScan) {
+          const expectedRel = path.relative(targetConfigDir, absoluteScanPath).replace(/\\/g, "/");
+          candidateFiles = candidateFiles.filter(f => f === expectedRel);
+        }
       } else {
-        const mergedIgnores = [
-          ...EXCLUDED_DIRECTORIES,
-          ...(options.ignore ?? []).map((i: string) => `**/${i}/**`),
-          ...config.ignore.map((i: string) => `**/${i}/**`)
-        ];
+        if (isFileScan) {
+          candidateFiles = [path.relative(targetConfigDir, absoluteScanPath)];
+        } else {
+          const mergedIgnores = [
+            ...EXCLUDED_DIRECTORIES,
+            ...(options.ignore ?? []).map((i: string) => `**/${i}/**`),
+            ...config.ignore.map((i: string) => `**/${i}/**`)
+          ];
 
-        candidateFiles = await fg(["**/*"], {
-          cwd: targetDir,
-          dot: true,
-          ignore: mergedIgnores,
-          onlyFiles: true,
-          followSymbolicLinks: false
-        });
+          candidateFiles = await fg(["**/*"], {
+            cwd: targetConfigDir,
+            dot: true,
+            ignore: mergedIgnores,
+            onlyFiles: true,
+            followSymbolicLinks: false
+          });
+        }
       }
 
       for (const rawPath of candidateFiles) {
@@ -103,11 +134,11 @@ export class ProjectScanner {
           continue;
         }
 
-        const absolutePath = path.resolve(targetDir, normalizedPath);
+        const absolutePath = path.resolve(targetConfigDir, normalizedPath);
         let fileData: FileContent | null = null;
 
         if (options.staged) {
-          const gitRoot = await getGitRoot(targetDir);
+          const gitRoot = await getGitRoot(targetConfigDir);
           const relToGitRoot = path.relative(gitRoot, absolutePath).replace(/\\/g, "/");
           fileData = await readStagedFileLines(gitRoot, relToGitRoot, maxFileSizeBytes);
         } else {
@@ -139,7 +170,7 @@ export class ProjectScanner {
     }
 
     // Baseline Mantığı
-    const defaultBaselineFile = path.resolve(targetDir, ".gitleak-radar-baseline.json");
+    const defaultBaselineFile = path.resolve(targetConfigDir, ".gitleak-radar-baseline.json");
 
     if (options.createBaseline) {
       const targetBaselinePath = typeof options.createBaseline === "string"
