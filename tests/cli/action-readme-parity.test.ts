@@ -41,7 +41,7 @@ describe("action.yml and README.md Parity", () => {
 
         // Action github-token default is empty string - map it properly
         expect(actionInputs.get("path")).toBe(".");
-        expect(actionInputs.get("version")).toBe("1.5.1");
+        expect(actionInputs.get("version")).toBe("1.5.2");
 
         // Build map from README Table
         const readmeTablePrefix = "| Input | Default | Purpose |";
