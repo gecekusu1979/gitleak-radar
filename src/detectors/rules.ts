@@ -14,8 +14,8 @@ export const DETECTION_RULES: DetectionRule[] = [
     name: "AWS Secret Access Key",
     description: "Identifies high-entropy AWS Secret Access Key patterns",
     severity: "critical",
-    pattern: /(?:aws_secret_access_key|aws_secret_key|secret_key)\s*[:=]\s*["']?([A-Za-z0-9\/+=]{40})["']?/gi,
-    keywords: ["aws_secret", "secret_key"]
+    pattern: /(?:aws[-_]?secret[-_]?access[-_]?key|aws[-_]?secret[-_]?key|secret[-_]?access[-_]?key|secret[-_]?key)\s*[:=]\s*["']?([A-Za-z0-9\/+=]{40})["']?/gi,
+    keywords: ["aws", "secret", "key"]
   },
   {
     id: "github-pat",
@@ -51,11 +51,59 @@ export const DETECTION_RULES: DetectionRule[] = [
   },
   {
     id: "slack-webhook",
-    name: "Slack Incoming Webhook",
-    description: "Identifies published Slack incoming webhook URIs",
+    name: "Slack Webhook URL",
+    description: "Identifies standard Slack incoming webhook URLs",
     severity: "high",
-    pattern: /https:\/\/hooks\.slack\.com\/services\/T[A-Z0-9_]+\/B[A-Z0-9_]+\/[A-Za-z0-9]+/g,
-    keywords: ["hooks.slack.com"]
+    pattern: /(https:\/\/hooks\.slack\.com\/services\/T[a-zA-Z0-9_]{8,}\/B[a-zA-Z0-9_]{8,}\/[a-zA-Z0-9_]{24})/g,
+    keywords: ["hooks.slack.com/services"]
+  },
+  {
+    id: "gcp-service-account",
+    name: "GCP Service Account Private Key",
+    description: "Identifies Google Cloud Platform service account private keys",
+    severity: "critical",
+    pattern: /("type":\s*"service_account"[\s\S]*?"private_key":\s*"-----BEGIN PRIVATE KEY-----\n[A-Za-z0-9\/+=\n]+?\n-----END PRIVATE KEY-----\n")/g,
+    keywords: ["service_account", "private_key"]
+  },
+  {
+    id: "gcp-api-key",
+    name: "GCP API Key",
+    description: "Identifies Google Cloud API keys",
+    severity: "high",
+    pattern: /\bAIza[0-9A-Za-z\-_]{35}\b/g,
+    keywords: ["AIza"]
+  },
+  {
+    id: "azure-ad-client-secret",
+    name: "Azure AD Client Secret",
+    description: "Identifies Azure App Service / AD client secrets",
+    severity: "critical",
+    pattern: /(?:client_secret|clientsecret|tenant_id)\s*[:=]\s*["']?([a-zA-Z0-9~.-_]{30,45})["']?/ig,
+    keywords: ["client_secret", "clientsecret", "tenant_id"]
+  },
+  {
+    id: "heroku-api-key",
+    name: "Heroku API Key",
+    description: "Identifies Heroku authorization API keys",
+    severity: "high",
+    pattern: /(?:heroku[-_]?api[-_]?key|heroku[-_]?key)\s*[:=]\s*["']?([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})["']?/ig,
+    keywords: ["heroku"]
+  },
+  {
+    id: "firebase-url",
+    name: "Firebase Realtime DB URL",
+    description: "Identifies Firebase database domain mappings",
+    severity: "medium",
+    pattern: /(https:\/\/[a-z0-9-]+\.firebaseio\.com)/g,
+    keywords: ["firebaseio.com"]
+  },
+  {
+    id: "npm-access-token",
+    name: "NPM Access Token",
+    description: "Identifies NPM access tokens for package registry",
+    severity: "high",
+    pattern: /\b(npm_[A-Za-z0-9]{36})\b/g,
+    keywords: ["npm_"]
   },
   {
     id: "azure-storage-key",
@@ -70,6 +118,8 @@ export const DETECTION_RULES: DetectionRule[] = [
     name: "JSON Web Token (JWT)",
     description: "Identifies hardcoded base64-encoded JWT signatures",
     severity: "high",
+    requiresEntropy: true,
+    minEntropy: 3.0,
     pattern: /\b(ey[A-Za-z0-9-_=]+\.ey[A-Za-z0-9-_=]+\.[A-Za-z0-9-_.+/=]+)\b/g,
     keywords: ["ey"]
   },
@@ -160,14 +210,16 @@ export const DETECTION_RULES: DetectionRule[] = [
     severity: "medium",
     requiresEntropy: true,
     minEntropy: 3.0,
-    pattern: /(?:api_key|apikey|secret|api_token)\s*[:=]\s*["']?([A-Za-z0-9\-_]{20,64})["']?/gi,
-    keywords: ["api_key", "apikey", "secret", "api_token"]
+    pattern: /(?:api[-_]?key|secret|api[-_]?token)\s*[:=]\s*["']?([A-Za-z0-9\-_]{20,64})["']?/gi,
+    keywords: ["api", "secret", "token"]
   },
   {
     id: "generic-bearer-token",
     name: "Generic Bearer Token",
     description: "Identifies hardcoded Bearer authorization tokens",
     severity: "high",
+    requiresEntropy: true,
+    minEntropy: 3.0,
     pattern: /(?:bearer)\s+([A-Za-z0-9\-._~+/]{20,}=*)/gi,
     keywords: ["bearer"]
   },
@@ -176,6 +228,7 @@ export const DETECTION_RULES: DetectionRule[] = [
     name: "Generic Password Assignment",
     description: "Identifies static password variable definitions",
     severity: "medium",
+    minEntropy: 3.0,
     pattern: /(?:password|passwd|pwd)\s*[:=]\s*["']?([^"'\s#]{8,64})["']?/gi,
     keywords: ["password", "passwd", "pwd"]
   }

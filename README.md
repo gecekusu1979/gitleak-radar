@@ -1,10 +1,10 @@
-﻿# GitLeak Radar
+# GitLeak Radar
 
 [![npm version](https://img.shields.io/npm/v/gitleak-radar.svg?color=cb3837)](https://www.npmjs.com/package/gitleak-radar)
 [![npm downloads](https://img.shields.io/npm/dm/gitleak-radar.svg)](https://www.npmjs.com/package/gitleak-radar)
 
 [![CI](https://github.com/gecekusu1979/gitleak-radar/actions/workflows/gitleak-radar.yml/badge.svg)](https://github.com/gecekusu1979/gitleak-radar/actions)
-[![tests](https://img.shields.io/badge/tests-135%2F135%20passing-brightgreen)](https://github.com/gecekusu1979/gitleak-radar)
+[![tests](https://img.shields.io/badge/tests-151%2F151%20passing-brightgreen)](https://github.com/gecekusu1979/gitleak-radar)
 [![SARIF](https://img.shields.io/badge/SARIF-v2.1.0%20Compliant-blue.svg)]()
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict%20Mode-3178c6.svg)](https://www.typescriptlang.org/)
@@ -105,8 +105,8 @@ Baseline entries use SHA-256 fingerprints based on finding coordinates and rule 
 
 Use the composite action from a tagged release. Pinning the tag or commit is
 recommended for reproducible CI. The action release and the npm scanner
-release is synchronized at `v1.5.2`; the action runs the reviewed
-`gitleak-radar@1.5.2` package by default.
+release is synchronized at `v1.5.3`; the action runs the reviewed
+`gitleak-radar@1.5.3` package by default.
 
 ```yaml
 permissions:
@@ -118,9 +118,9 @@ steps:
     with:
       fetch-depth: 0
   - name: Scan for secrets
-    uses: gecekusu1979/gitleak-radar@v1.5.2
+    uses: gecekusu1979/gitleak-radar@v1.5.3
     with:
-      version: '1.5.2'
+      version: '1.5.3'
       upload-sarif: true
       upload-artifact: true
       fail-on-findings: true
@@ -151,7 +151,7 @@ during installation.
 | Input | Default | Purpose |
 | --- | --- | --- |
 | `path` | `.` | Directory to scan |
-| `version` | `1.5.2` | Exact npm scanner version |
+| `version` | `1.5.3` | Exact npm scanner version |
 | `severity` | `low` | Minimum finding severity |
 | `since` | empty | Scan changes since a Git ref |
 | `staged` | `false` | Scan staged Git index files |
@@ -241,7 +241,17 @@ pnpm add -g gitleak-radar
 Alternatively, invoke directly with `npx`:
 
 ```bash
-npx gitleak-radar scan .
+npx gitleak-radar scan ./my-project
+```
+
+### Docker
+Scan directories seamlessly using the isolated Docker container.
+
+```bash
+docker build -t gitleak-radar .
+
+# Mount your local folder to /scan inside the container
+docker run --rm -v $(pwd):/scan gitleak-radar scan /scan
 ```
 
 ### Basic Scans
@@ -529,11 +539,8 @@ pnpm install
 # Run TypeScript typechecks
 pnpm typecheck
 
-# Run the Vitest test suite (135 automated tests)
+# Run the Vitest test suite (151 automated tests)
 pnpm test
-
-# Run the test suite with coverage
-pnpm test:coverage
 
 # Build the production bundle
 pnpm build
@@ -556,7 +563,7 @@ Snapshot from `pnpm test:coverage` (v8 provider):
 | `src/config` | 74.48% | 77.58% | 100% |
 | `src/hooks` | 89.09% | 88.88% | 100% |
 
-Note: `src/cli/index.ts` and `src/reporters/terminal.ts` report 0% in this table because they are only exercised through the compiled CLI in a separate OS process (`tests/cli/*.test.ts` via `execFile`) — v8's in-process coverage provider cannot instrument a spawned child process, so this understates real behavioral coverage.
+Note: `src/cli/index.ts` and `src/reporters/terminal.ts` report 0% in this table because they are only exercised through the compiled CLI in a separate OS process (`tests/cli/*.test.ts` via `execFile`) � v8's in-process coverage provider cannot instrument a spawned child process, so this understates real behavioral coverage.
 
 ## Why GitLeak Radar?
 

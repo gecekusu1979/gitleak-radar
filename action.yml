@@ -1,4 +1,4 @@
-﻿name: GitLeak Radar
+name: GitLeak Radar
 description: Scan repositories for leaked secrets
 author: gecekusu1979
 
@@ -14,7 +14,7 @@ inputs:
   version:
     description: 'Pinned gitleak-radar npm version. Bump this deliberately on each release for reproducible scans.'
     required: false
-    default: '1.5.2'
+    default: '1.5.3'
   severity:
     description: 'Minimum severity threshold (low, medium, high, critical)'
     required: false
@@ -125,10 +125,10 @@ runs:
           try {
             const sarif = JSON.parse(fs.readFileSync(sarifPath, 'utf8'));
             const results = sarif.runs?.[0]?.results || [];
-            let summary = '## 🛡️ GitLeak Radar Scan\n\n';
+            let summary = '## ??? GitLeak Radar Scan\n\n';
             summary += results.length === 0
-              ? '✅ **No secrets detected.**\n\n'
-              : `⚠️ **${results.length} potential secret(s) detected.**\n\n`;
+              ? '? **No secrets detected.**\n\n'
+              : `?? **${results.length} potential secret(s) detected.**\n\n`;
             summary += `- **Scanner:** \`gitleak-radar\`\n`;
             summary += `- **SARIF report:** \`${escapeMarkdown(sarifPath)}\`\n\n`;
 
@@ -139,7 +139,7 @@ runs:
                 const location = result.locations?.[0]?.physicalLocation;
                 const file = location?.artifactLocation?.uri;
                 const line = location?.region?.startLine;
-                summary += `| \`${escapeMarkdown(result.ruleId)}\` | \`${escapeMarkdown(file)}\` | ${Number.isInteger(line) ? line : '—'} |\n`;
+                summary += `| \`${escapeMarkdown(result.ruleId)}\` | \`${escapeMarkdown(file)}\` | ${Number.isInteger(line) ? line : '�'} |\n`;
               }
               if (results.length > 10) {
                 summary += `\n*Showing the first 10 findings. See the SARIF report for all ${results.length} findings.*\n`;
@@ -251,23 +251,23 @@ runs:
           const tableValue = (value) => String(value ?? 'unknown')
             .replace(/[`|\\\r\n]/g, (character) => `\\${character}`);
 
-          let body = '### ğŸ›¡ï¸ GitLeak Radar Security Scan Report\n\n';
+          let body = '### 🛡️ GitLeak Radar Security Scan Report\n\n';
           if (findingsCount === 0) {
-            body += 'âœ… **No secrets detected!** Your code is clean and secure.\n';
+            body += '✅ **No secrets detected!** Your code is clean and secure.\n';
           } else {
-            body += `âš ï¸ **Found ${findingsCount} potential secret(s) in this Pull Request.**\n\n`;
+            body += `⚠️ **Found ${findingsCount} potential secret(s) in this Pull Request.**\n\n`;
             body += '| Severity | Rule ID | File | Location |\n';
             body += '| :--- | :--- | :--- | :--- |\n';
             for (const r of results.slice(0, 10)) {
               const ruleId = tableValue(r.ruleId);
-              const level = r.level === 'error' ? 'ğŸ”´ Critical/High' : 'ğŸŸ¡ Warning';
+              const level = r.level === 'error' ? '🔴 Critical/High' : '🟡 Warning';
               const loc = r.locations?.[0]?.physicalLocation;
               const file = tableValue(loc?.artifactLocation?.uri);
               const line = Number.isInteger(loc?.region?.startLine) ? loc.region.startLine : 1;
-              body += `| ${level} | \`${ruleId}\` | \`${file}\` | SatÄ±r ${line} |\n`;
+              body += `| ${level} | \`${ruleId}\` | \`${file}\` | Satır ${line} |\n`;
             }
             if (findingsCount > 10) {
-              body += `\n*...ve ${findingsCount - 10} bulgu daha (ayrÄ±ntÄ±lar iÃ§in Security sekmesine veya CI loglarÄ±na bakÄ±n).*`;
+              body += `\n*...ve ${findingsCount - 10} bulgu daha (ayrıntılar için Security sekmesine veya CI loglarına bakın).*`;
             }
           }
 

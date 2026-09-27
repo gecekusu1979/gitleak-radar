@@ -19,7 +19,8 @@ describe("Security Scorer", () => {
       file: "src/aws.ts",
       line: idx + 1,
       column: 1,
-      maskedValue: "AKIA********"
+      maskedValue: "AKIA********",
+      secretHash: `hash-${idx}`
     }));
 
     const report = calculateSecurityScore(findings);
@@ -58,7 +59,7 @@ describe("Security Scorer", () => {
     expect(report.counts.critical).toBe(1);
   });
 
-  it("applies separate penalties for same ruleId in different files", () => {
+  it("deduplicates exact same secret across different files", () => {
     const findings: Finding[] = [
       {
         ruleId: "aws-access-key",
@@ -67,7 +68,8 @@ describe("Security Scorer", () => {
         file: "src/file1.ts",
         line: 1,
         column: 1,
-        maskedValue: "AKIA********"
+        maskedValue: "AKIA********",
+        secretHash: "same-global-hash"
       },
       {
         ruleId: "aws-access-key",
@@ -76,17 +78,18 @@ describe("Security Scorer", () => {
         file: "src/file2.ts",
         line: 1,
         column: 1,
-        maskedValue: "AKIA********"
+        maskedValue: "AKIA********",
+        secretHash: "same-global-hash"
       }
     ];
 
     const report = calculateSecurityScore(findings);
-    // 2 * 35 = 70 penalty -> 100 - 70 = 30
-    expect(report.score).toBe(30);
-    expect(report.counts.critical).toBe(2);
+    // 1 * 35 = 35 penalty -> 100 - 35 = 65
+    expect(report.score).toBe(65);
+    expect(report.counts.critical).toBe(1);
   });
 
-  it("deduplicates findings at the exact same location keeping the higher severity", () => {
+  it("deduplicates findings of the same secret keeping the higher severity", () => {
     const findings: Finding[] = [
       {
         ruleId: "generic-api-key",
@@ -95,6 +98,7 @@ describe("Security Scorer", () => {
         file: "src/api.ts",
         line: 10,
         column: 5,
+        secretHash: "shared-hash",
         maskedValue: "tok_********"
       },
       {
@@ -104,6 +108,7 @@ describe("Security Scorer", () => {
         file: "src/api.ts",
         line: 10,
         column: 5,
+        secretHash: "shared-hash",
         maskedValue: "tok_********"
       }
     ];

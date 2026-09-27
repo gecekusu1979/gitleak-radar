@@ -5,17 +5,33 @@ import { calculateShannonEntropy, isHighEntropyToken } from "./entropy.js";
 import { isLineIgnoredByDirective } from "./inline-ignore.js";
 import { recursivelyDecodeLine, DEFAULT_MAX_DECODE_DEPTH } from "./decoder.js";
 
-export const MAX_LINE_LENGTH = 8192;
+export const MAX_LINE_LENGTH = 65536;
 
 export class SecretDetector {
   private rules: DetectionRule[];
   private allowlist: ReadonlySet<string>;
   private maxDecodeDepth: number;
+  private globalKeywordRegex: RegExp | null = null;
+  private hasRulesWithoutKeywords: boolean = false;
 
   constructor(rules: DetectionRule[], allowlist: string[] = [], maxDecodeDepth: number = DEFAULT_MAX_DECODE_DEPTH) {
     this.rules = rules;
     this.allowlist = new Set(allowlist.map((value) => value.trim()).filter(Boolean));
     this.maxDecodeDepth = maxDecodeDepth;
+
+    const allKeywords = new Set<string>();
+    for (const rule of rules) {
+      if (rule.keywords && rule.keywords.length > 0) {
+        for (const kw of rule.keywords) {
+          allKeywords.add(kw.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+        }
+      } else {
+        this.hasRulesWithoutKeywords = true;
+      }
+    }
+    if (allKeywords.size > 0) {
+      this.globalKeywordRegex = new RegExp("(" + Array.from(allKeywords).join("|") + ")", "i");
+    }
   }
 
   public mask(secret: string): string {
@@ -45,6 +61,13 @@ export class SecretDetector {
   ): void {
     const lowerText = text.toLowerCase();
     const minSeverityWeight = SeverityOrder[minSeverity];
+
+    // Global Keyword Pre-filter Performance Optimization
+    if (this.globalKeywordRegex && !this.globalKeywordRegex.test(lowerText)) {
+      if (!this.hasRulesWithoutKeywords) {
+        return; // Skip completely if no keywords map and all rules require keywords
+      }
+    }
 
     for (const rule of this.rules) {
       if (SeverityOrder[rule.severity] < minSeverityWeight) {
@@ -101,7 +124,8 @@ export class SecretDetector {
           line: lineNumber,
           column,
           maskedValue: this.mask(rawSecret),
-          secretHash: crypto.createHash("sha256").update(rawSecret).digest("hex")
+          secretHash: crypto.createHash("sha256").update(rawSecret).digest("hex"),
+          rawSecret
         });
 
         if (!rule.pattern.global) {
@@ -119,7 +143,23 @@ export class SecretDetector {
     previousLine?: string
   ): Finding[] {
     const findings: Finding[] = [];
-    const targetLine = line.length > MAX_LINE_LENGTH ? line.slice(0, MAX_LINE_LENGTH) : line;
+
+    // ZWSP and invisible formatting mark stripping for evasion prevention
+    let sanitizedLine = line.replace(/[\u200B-\u200D\uFEFF]/g, "");
+
+    // Naive Cyrillic Homoglyph Normalization (Fold tricky Cyrillic characters to ASCII to prevent evasion)
+    sanitizedLine = sanitizedLine.replace(/[Аа]/g, "a")
+      .replace(/[В]/g, "B")
+      .replace(/[Сс]/g, "c")
+      .replace(/[Ее]/g, "e")
+      .replace(/[Оо]/g, "o")
+      .replace(/[Рр]/g, "p")
+      .replace(/[Хх]/g, "x")
+      .replace(/[М]/g, "M")
+      .replace(/[Н]/g, "H")
+      .replace(/[Т]/g, "T");
+
+    const targetLine = sanitizedLine.length > MAX_LINE_LENGTH ? sanitizedLine.slice(0, MAX_LINE_LENGTH) : sanitizedLine;
 
     if (isLineIgnoredByDirective(targetLine, previousLine)) {
       return [];

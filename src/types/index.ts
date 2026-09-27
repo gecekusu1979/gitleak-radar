@@ -43,10 +43,12 @@ export interface Finding {
   line: number;
   column: number;
   maskedValue: string;
+  rawSecret?: string;
   secretHash?: string;
   commit?: string;
   commitAuthor?: string;
   commitDate?: string;
+  verified?: boolean;
 }
 
 export interface ScanOptions {
@@ -65,6 +67,8 @@ export interface ScanOptions {
   allowlist?: string[];
   maxDecodeDepth?: number;
   createBaseline?: boolean | string;
+  scanAllExtensions?: boolean;
+  verify?: boolean;
   onFileAction?: (filePath: string, status: "scanned" | "ignored" | "binary") => void;
 }
 

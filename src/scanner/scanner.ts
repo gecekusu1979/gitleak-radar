@@ -129,7 +129,7 @@ export class ProjectScanner {
       for (const rawPath of candidateFiles) {
         const normalizedPath = rawPath.replace(/\\/g, "/");
 
-        if (shouldIgnorePath(normalizedPath, [...(options.ignore ?? []), ...config.ignore])) {
+        if (shouldIgnorePath(normalizedPath, [...(options.ignore ?? []), ...config.ignore], !!options.scanAllExtensions)) {
           options.onFileAction?.(normalizedPath, "ignored");
           continue;
         }
@@ -197,6 +197,22 @@ export class ProjectScanner {
 
     let finalFindings = rawFindings;
     let suppressedCount = 0;
+
+    if (options.verify) {
+      const { verifyFinding } = await import("../verifiers/index.js");
+      const verifyPromises = rawFindings.map(async (finding) => {
+        if (finding.rawSecret) {
+          const isVerified = await verifyFinding(finding, finding.rawSecret);
+          if (isVerified !== null) {
+            finding.verified = isVerified;
+          }
+        }
+      });
+      await Promise.all(verifyPromises);
+    }
+
+    for (const f of rawFindings) delete f.rawSecret;
+
     const resolvedBaselinePath = options.baselinePath
       ? path.resolve(process.cwd(), options.baselinePath)
       : (fs.existsSync(defaultBaselineFile) ? defaultBaselineFile : null);

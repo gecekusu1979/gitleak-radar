@@ -60,6 +60,7 @@ program
   .option("--junit [file]", "Output results in JUnit XML format (to stdout or file)")
   .option("--gitlab [file]", "Output results in GitLab Code Quality JSON format (to stdout or file)")
   .option("--github-actions", "Emit GitHub Actions workflow annotations (::error/::warning)")
+  .option("--scan-all-extensions", "Scan all files regardless of their extension (bypasses EXCLUDED_EXTENSIONS)")
   .action(
     async (
       targetPath: string,
@@ -81,6 +82,7 @@ program
         junit?: string | boolean;
         gitlab?: string | boolean;
         githubActions?: boolean;
+        scanAllExtensions?: boolean;
       }
     ) => {
       const validSeverities: Severity[] = ["low", "medium", "high", "critical"];
@@ -142,6 +144,7 @@ program
           staged: options.staged,
           history: options.history,
           since: options.since,
+          scanAllExtensions: options.scanAllExtensions,
           onFileAction: (filePath: string, status: "scanned" | "ignored" | "binary") => {
             if (!options.verbose) return;
             if (status === "scanned") console.log(`${chalk.green("✓")} ${filePath}`);
@@ -214,7 +217,7 @@ program
     }
 
     const template = {
-      ignore: ["tests", "dist", "node_modules"],
+      ignore: ["dist", "node_modules"],
       maxFileSize: "10MB",
       rules: {},
       customRules: [

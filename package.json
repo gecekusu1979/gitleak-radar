@@ -1,6 +1,6 @@
-﻿{
+{
   "name": "gitleak-radar",
-  "version": "1.5.2",
+  "version": "1.5.3",
   "description": "Fast, local-first source code secret scanner and pre-commit gate CLI.",
   "keywords": [
     "security",
@@ -78,6 +78,10 @@
     "./github-actions": {
       "types": "./dist/reporters/github-actions.d.ts",
       "import": "./dist/reporters/github-actions.js"
+    },
+    "./detectors": {
+      "types": "./dist/detectors/index.d.ts",
+      "import": "./dist/detectors/index.js"
     }
   }
 }

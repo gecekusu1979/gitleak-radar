@@ -21,7 +21,11 @@ export function renderTerminalReport(result: ScanResult, targetPath: string): vo
     for (const item of result.findings) {
       const badge = SEVERITY_BADGES[item.severity];
       const location = chalk.gray(`${item.file}:${item.line}:${item.column}`);
-      console.log(`${badge}  ${location}`);
+      const verifiedBadge = item.verified === true ? chalk.bgGreen.bold.white(" ACTIVE ")
+        : item.verified === false ? chalk.bgRed.bold.white(" REVOKED/INVALID ")
+          : "";
+
+      console.log(`${badge}  ${location} ${verifiedBadge}`);
       console.log(`   ${chalk.bold(item.ruleName)}`);
       console.log(`   Fingerprint: ${chalk.cyan(item.maskedValue)}\n`);
     }

@@ -15,27 +15,26 @@ export function calculateSecurityScore(findings: Finding[]): ScoreReport {
     low: 0
   };
 
-  // 1. Konum bazlı deduplikasyon: Aynı dosya, satır, sütun ve committe
-  // birden fazla kural tetiklenirse en yüksek ciddiyeti (severity) seç
+  // 1. İçerik bazlı deduplikasyon: Birebir aynı secret 
+  // birden fazla konumda veya kuralda tespit edilirse birleştir (tekil risk havuzu)
   const locationMap = new Map<string, Finding>();
   for (const finding of findings) {
-    const locKey = `${finding.file}:${finding.line}:${finding.column}:${finding.commit ?? ""}`;
-    const existing = locationMap.get(locKey);
+    const dedupKey = finding.secretHash || finding.maskedValue;
+    const existing = locationMap.get(dedupKey);
     if (!existing) {
-      locationMap.set(locKey, finding);
+      locationMap.set(dedupKey, finding);
     } else {
       const existingWeight = SeverityOrder[existing.severity] ?? 0;
       const currentWeight = SeverityOrder[finding.severity] ?? 0;
       if (currentWeight > existingWeight) {
-        locationMap.set(locKey, finding);
+        locationMap.set(dedupKey, finding);
       }
     }
   }
 
   const deduplicatedFindings = Array.from(locationMap.values());
 
-  // 2. Fiziksel olarak farklı konumdaki her gerçek sızıntı kendi cezasını öder.
-  // ruleId::file tavanı kaldırıldı; farklı satırlardaki sızıntılar skoru düşürür.
+  // 2. Birbirinden farklı (rule + hash olarak) her sızıntı kendi cezasını öder.
   let totalPenalty = 0;
 
   for (const finding of deduplicatedFindings) {

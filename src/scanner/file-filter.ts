@@ -48,12 +48,12 @@ const OBVIOUS_PLACEHOLDER_SUBSTRINGS = [
   "placeholder"
 ];
 
-export function shouldIgnoreFile(filePath: string): boolean {
+export function shouldIgnoreFile(filePath: string, scanAllExtensions: boolean = false): boolean {
   const normalizedPath = filePath.replace(/\\/g, "/");
   const ext = path.extname(filePath).toLowerCase();
   const basename = path.basename(filePath);
 
-  if (EXCLUDED_EXTENSIONS.has(ext)) return true;
+  if (!scanAllExtensions && EXCLUDED_EXTENSIONS.has(ext)) return true;
   if (EXCLUDED_FILENAMES.has(basename)) return true;
   if (basename.endsWith(".min.js") || basename.endsWith(".min.css")) return true;
 
@@ -121,8 +121,8 @@ export function isPlaceholderOrExample(
 /**
  * Hem dahili hariç tutulanları hem de özel desenleri (glob/uzantı/dizin) doğrular.
  */
-export function shouldIgnorePath(filePath: string, customIgnores: string[] = []): boolean {
-  if (shouldIgnoreFile(filePath)) {
+export function shouldIgnorePath(filePath: string, customIgnores: string[] = [], scanAllExtensions: boolean = false): boolean {
+  if (shouldIgnoreFile(filePath, scanAllExtensions)) {
     return true;
   }
 
