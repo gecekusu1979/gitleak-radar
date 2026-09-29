@@ -1,15 +1,21 @@
-# GitLeak Radar
+<p align="center">
+  <img src="assets/logo.png" alt="GitLeak Radar Logo" width="400" />
+</p>
 
-[![npm version](https://img.shields.io/npm/v/gitleak-radar.svg?color=cb3837)](https://www.npmjs.com/package/gitleak-radar)
-[![npm downloads](https://img.shields.io/npm/dm/gitleak-radar.svg)](https://www.npmjs.com/package/gitleak-radar)
+<h1 align="center">GitLeak Radar</h1>
 
-[![CI](https://github.com/gecekusu1979/gitleak-radar/actions/workflows/gitleak-radar.yml/badge.svg)](https://github.com/gecekusu1979/gitleak-radar/actions)
-[![tests](https://img.shields.io/badge/tests-151%2F151%20passing-brightgreen)](https://github.com/gecekusu1979/gitleak-radar)
-[![SARIF](https://img.shields.io/badge/SARIF-v2.1.0%20Compliant-blue.svg)]()
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
-[![TypeScript](https://img.shields.io/badge/TypeScript-Strict%20Mode-3178c6.svg)](https://www.typescriptlang.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18.0.0-339933.svg)](https://nodejs.org/)
-[![Zero Telemetry](https://img.shields.io/badge/Telemetry-0%25%20(Local%20Only)-success.svg)](#security-model)
+<p align="center">
+  <a href="https://www.npmjs.com/package/gitleak-radar"><img src="https://img.shields.io/npm/v/gitleak-radar.svg?color=cb3837" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/gitleak-radar"><img src="https://img.shields.io/npm/dm/gitleak-radar.svg" alt="npm downloads"></a>
+  <a href="https://github.com/gecekusu1979/gitleak-radar/actions"><img src="https://github.com/gecekusu1979/gitleak-radar/actions/workflows/gitleak-radar.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/gecekusu1979/gitleak-radar"><img src="https://img.shields.io/badge/tests-151%2F151%20passing-brightgreen" alt="tests"></a>
+  <a href=""><img src="https://img.shields.io/badge/SARIF-v2.1.0%20Compliant-blue.svg" alt="SARIF"></a>
+  <br/>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg" alt="License"></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-Strict%20Mode-3178c6.svg" alt="TypeScript"></a>
+  <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-%3E%3D18.0.0-339933.svg" alt="Node.js"></a>
+  <a href="#security-model"><img src="https://img.shields.io/badge/Telemetry-0%25%20(Local%20Only)-success.svg" alt="Zero Telemetry"></a>
+</p>
 
 > **Enterprise-grade, local-first source code secret scanner and automated Git pre-commit gate designed to intercept exposed API keys, access tokens, private keys, and database credentials before they reach version control or CI/CD pipelines.**
 
@@ -105,8 +111,8 @@ Baseline entries use SHA-256 fingerprints based on finding coordinates and rule 
 
 Use the composite action from a tagged release. Pinning the tag or commit is
 recommended for reproducible CI. The action release and the npm scanner
-release is synchronized at `v1.5.3`; the action runs the reviewed
-`gitleak-radar@1.5.3` package by default.
+release is synchronized at `v1.5.4`; the action runs the reviewed
+`gitleak-radar@1.5.4` package by default.
 
 ```yaml
 permissions:
@@ -118,9 +124,9 @@ steps:
     with:
       fetch-depth: 0
   - name: Scan for secrets
-    uses: gecekusu1979/gitleak-radar@v1.5.3
+    uses: gecekusu1979/gitleak-radar@v1.5.4
     with:
-      version: '1.5.3'
+      version: '1.5.4'
       upload-sarif: true
       upload-artifact: true
       fail-on-findings: true
@@ -151,7 +157,7 @@ during installation.
 | Input | Default | Purpose |
 | --- | --- | --- |
 | `path` | `.` | Directory to scan |
-| `version` | `1.5.3` | Exact npm scanner version |
+| `version` | `1.5.4` | Exact npm scanner version |
 | `severity` | `low` | Minimum finding severity |
 | `since` | empty | Scan changes since a Git ref |
 | `staged` | `false` | Scan staged Git index files |
@@ -563,7 +569,7 @@ Snapshot from `pnpm test:coverage` (v8 provider):
 | `src/config` | 74.48% | 77.58% | 100% |
 | `src/hooks` | 89.09% | 88.88% | 100% |
 
-Note: `src/cli/index.ts` and `src/reporters/terminal.ts` report 0% in this table because they are only exercised through the compiled CLI in a separate OS process (`tests/cli/*.test.ts` via `execFile`) — v8's in-process coverage provider cannot instrument a spawned child process, so this understates real behavioral coverage.
+Note: `src/cli/index.ts` and `src/reporters/terminal.ts` report 0% in this table because they are only exercised through the compiled CLI in a separate OS process (`tests/cli/*.test.ts` via `execFile`) ï¿½ v8's in-process coverage provider cannot instrument a spawned child process, so this understates real behavioral coverage.
 
 ## Why GitLeak Radar?
 
@@ -573,6 +579,14 @@ Note: `src/cli/index.ts` and `src/reporters/terminal.ts` report 0% in this table
 - **Type-Safe Core:** Built with strict TypeScript checks and validated configuration schemas.
 
 ## Roadmap
+
+### Completed in v1.5.4 (Evasion Defense & FP Reduction)
+
+- [x] Robust UTF-16LE/BE active heuristic decoding for PowerShell and text-editor encoded `.env` files
+- [x] Eliminated Generic Password false-positives via context-aware negative lookahead filtering (`process.env`, `fn()`)
+- [x] Line-chunking with 256-byte overlapping window bounds to prevent evasion on massively long lines (`>65536` chars)
+- [x] Enhanced URL `%XX` token decoding for single-byte fragments (`SINGLE_PERCENT_TOKEN`)
+- [x] Strict `.min.js` and `.min.css` payload evaluation toggle under `--scan-all-extensions` flag
 
 ### Completed in v1.4.6
 

@@ -157,14 +157,35 @@ export class ProjectScanner {
         for (let i = 0; i < fileData.lines.length; i++) {
           const lineContent = fileData.lines[i]!;
           const previousLine = i > 0 ? fileData.lines[i - 1] : undefined;
-          const lineFindings = detector.scanLine(
-            lineContent,
-            i + 1,
-            normalizedPath,
-            options.severity ?? "low",
-            previousLine
-          );
-          rawFindings.push(...lineFindings);
+
+          // Çok uzun satırları örtüşen parçalara böl (65 536 char limit)
+          const MAX_LINE_LENGTH = 65_536;
+          const CHUNK_OVERLAP = 256;
+          if (lineContent.length > MAX_LINE_LENGTH) {
+            let chunkStart = 0;
+            while (chunkStart < lineContent.length) {
+              const chunk = lineContent.slice(chunkStart, chunkStart + MAX_LINE_LENGTH);
+              const chunkFindings = detector.scanLine(
+                chunk,
+                i + 1,
+                normalizedPath,
+                options.severity ?? "low",
+                previousLine
+              );
+              rawFindings.push(...chunkFindings);
+              if (chunkStart + MAX_LINE_LENGTH >= lineContent.length) break;
+              chunkStart += MAX_LINE_LENGTH - CHUNK_OVERLAP;
+            }
+          } else {
+            const lineFindings = detector.scanLine(
+              lineContent,
+              i + 1,
+              normalizedPath,
+              options.severity ?? "low",
+              previousLine
+            );
+            rawFindings.push(...lineFindings);
+          }
         }
       }
     }

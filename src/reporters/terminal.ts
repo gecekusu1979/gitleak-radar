@@ -43,6 +43,7 @@ export function renderTerminalReport(result: ScanResult, targetPath: string): vo
   console.log(
     `Security Score: ${scoreColor.bold(`${result.summary.score}/100`)} (${chalk.italic(result.summary.tier)})`
   );
+  console.log(chalk.yellow("⭐ Support us by starring the repo: https://github.com/gecekusu1979/gitleak-radar"));
 
   const stats = [
     `${result.summary.findings} findings found`,

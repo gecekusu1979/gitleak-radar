@@ -84,14 +84,54 @@ export async function readFileLines(
 
     const rawBuffer = await fs.readFile(filePath);
 
-    const sampleSize = Math.min(rawBuffer.length, 1024);
-    for (let i = 0; i < sampleSize; i++) {
-      if (rawBuffer[i] === 0) {
-        return null;
+    // UTF-16 BOM tespiti: FF FE (UTF-16LE) veya FE FF (UTF-16BE)
+    let content: string;
+    if (rawBuffer.length >= 2 && rawBuffer[0] === 0xff && rawBuffer[1] === 0xfe) {
+      // UTF-16LE with BOM
+      content = rawBuffer.slice(2).toString("utf16le");
+    } else if (rawBuffer.length >= 2 && rawBuffer[0] === 0xfe && rawBuffer[1] === 0xff) {
+      // UTF-16BE with BOM — Node.js built-in'de doğrudan BE yok; manuel swap
+      const swapped = Buffer.allocUnsafe(rawBuffer.length - 2);
+      for (let i = 0; i < rawBuffer.length - 2; i += 2) {
+        swapped[i] = rawBuffer[i + 3]!;
+        swapped[i + 1] = rawBuffer[i + 2]!;
+      }
+      content = swapped.toString("utf16le");
+    } else {
+      // BOM yoksa: null-byte örüntüsüyle UTF-16LE tespiti dene
+      // UTF-16LE'de ASCII metin her çift byte'ta null içerir (örn. "A\0B\0")
+      const sampleSize = Math.min(rawBuffer.length, 512);
+      let nullCount = 0;
+      for (let i = 0; i < sampleSize; i++) {
+        if (rawBuffer[i] === 0) nullCount++;
+      }
+      // Byte'ların >%30'u null ise UTF-16LE olarak deneyerek oku
+      if (nullCount / sampleSize > 0.3 && rawBuffer.length >= 4) {
+        // İlk byte çift konumdaki karakterlerin printable olup olmadığını kontrol et
+        const sample = rawBuffer.slice(0, Math.min(rawBuffer.length, 256));
+        // Her iki byte'ta bir printable ASCII olması UTF-16LE işareti
+        const leLikely =
+          sample.length >= 4 &&
+          sample[0]! >= 0x20 && sample[0]! < 0x7f &&
+          sample[1] === 0 &&
+          sample[2]! >= 0x20 && sample[2]! < 0x7f &&
+          sample[3] === 0;
+        if (leLikely) {
+          content = rawBuffer.toString("utf16le");
+        } else {
+          // Genel binary dosya — atla
+          return null;
+        }
+      } else {
+        // Normal binary kontrol: tek null bile varsa atla
+        const checkSize = Math.min(rawBuffer.length, 1024);
+        for (let i = 0; i < checkSize; i++) {
+          if (rawBuffer[i] === 0) return null;
+        }
+        content = rawBuffer.toString("utf-8");
       }
     }
 
-    const content = rawBuffer.toString("utf-8");
     const lines = content.split(/\r?\n/);
 
     return {

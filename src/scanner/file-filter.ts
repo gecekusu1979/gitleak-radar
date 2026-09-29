@@ -36,7 +36,10 @@ const PLACEHOLDERS = [
   "my_secret",
   "placeholder",
   "dummy",
-  "todo"
+  "todo",
+  "your-password",
+  "your-secret",
+  "your-token"
 ];
 
 const OBVIOUS_PLACEHOLDER_SUBSTRINGS = [
@@ -45,7 +48,10 @@ const OBVIOUS_PLACEHOLDER_SUBSTRINGS = [
   "xxxx",
   "********",
   "my_secret",
-  "placeholder"
+  "placeholder",
+  "your-password",
+  "your-secret",
+  "your-token"
 ];
 
 export function shouldIgnoreFile(filePath: string, scanAllExtensions: boolean = false): boolean {
@@ -55,7 +61,7 @@ export function shouldIgnoreFile(filePath: string, scanAllExtensions: boolean = 
 
   if (!scanAllExtensions && EXCLUDED_EXTENSIONS.has(ext)) return true;
   if (EXCLUDED_FILENAMES.has(basename)) return true;
-  if (basename.endsWith(".min.js") || basename.endsWith(".min.css")) return true;
+  if (!scanAllExtensions && (basename.endsWith(".min.js") || basename.endsWith(".min.css"))) return true;
 
   return false;
 }

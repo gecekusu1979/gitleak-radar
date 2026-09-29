@@ -89,7 +89,7 @@ export class SecretDetector {
       let match: RegExpExecArray | null;
 
       while ((match = rule.pattern.exec(text)) !== null) {
-        const rawSecret = match[1] || match[0];
+        const rawSecret = match[1] || match[2] || match[0];
 
         if (isPlaceholderOrExample(rawSecret, text, filePath)) {
           continue;

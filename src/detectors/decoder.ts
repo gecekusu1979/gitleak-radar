@@ -5,6 +5,8 @@ export interface DecodedCandidate {
 
 const ENCODED_TOKEN = /[A-Za-z0-9+/_-]{16,}={0,2}/g;
 const URL_TOKEN = /(?:%[0-9a-f]{2}){2,}[A-Za-z0-9%._~!$&'()*+,;=:@/?-]*/gi;
+/** Tekli %XX dahil, en az bir yüzde-encode edilmiş token'ı yakalar */
+const SINGLE_PERCENT_TOKEN = /(?:%[0-9a-f]{2})+[A-Za-z0-9%._~!$&'()*+,;=:@/?-]*/gi;
 const MAX_DECODED_LENGTH = 8192;
 
 /** Hiçbir çağrı yerinde --max-decode-depth geçilmezse kullanılan varsayılan derinlik. */
@@ -116,6 +118,7 @@ export function recursivelyDecodeLine(
     for (const candidate of frontier) {
       collectMatches(ENCODED_TOKEN, candidate, candidates, seen, next);
       collectMatches(URL_TOKEN, candidate, candidates, seen, next);
+      collectMatches(SINGLE_PERCENT_TOKEN, candidate, candidates, seen, next);
     }
     frontier = next;
     if (frontier.length === 0) break;

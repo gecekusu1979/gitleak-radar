@@ -61,6 +61,7 @@ program
   .option("--gitlab [file]", "Output results in GitLab Code Quality JSON format (to stdout or file)")
   .option("--github-actions", "Emit GitHub Actions workflow annotations (::error/::warning)")
   .option("--scan-all-extensions", "Scan all files regardless of their extension (bypasses EXCLUDED_EXTENSIONS)")
+  .option("--verify", "Verify detected API keys (GitHub, Slack, Stripe) via live API requests")
   .action(
     async (
       targetPath: string,
@@ -83,6 +84,7 @@ program
         gitlab?: string | boolean;
         githubActions?: boolean;
         scanAllExtensions?: boolean;
+        verify?: boolean;
       }
     ) => {
       const validSeverities: Severity[] = ["low", "medium", "high", "critical"];
@@ -145,6 +147,7 @@ program
           history: options.history,
           since: options.since,
           scanAllExtensions: options.scanAllExtensions,
+          verify: options.verify,
           onFileAction: (filePath: string, status: "scanned" | "ignored" | "binary") => {
             if (!options.verbose) return;
             if (status === "scanned") console.log(`${chalk.green("✓")} ${filePath}`);

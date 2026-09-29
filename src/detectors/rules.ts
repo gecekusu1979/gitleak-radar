@@ -226,10 +226,15 @@ export const DETECTION_RULES: DetectionRule[] = [
   {
     id: "generic-password",
     name: "Generic Password Assignment",
-    description: "Identifies static password variable definitions",
+    description: "Identifies static password variable definitions with literal values",
     severity: "medium",
     minEntropy: 3.0,
-    pattern: /(?:password|passwd|pwd)\s*[:=]\s*["']?([^"'\s#]{8,64})["']?/gi,
+    // Expression değerleri negatif lookahead ile dışla:
+    //   process.env.X  → değer "process" ile başlar, "." içerir ama identifier+.identifier örüntüsü
+    //   fn()           → değer "(" ile sonlanmadan önce gelir
+    //   ${template}    → değer "$" ile başlar
+    // Yakaladığımız: quoted literal VEYA tırnaksız basit token (.env formatı)
+    pattern: /(?:password|passwd|pwd)\s*[:=]\s*(?!(?:process\.|getenv\b|\$\{|[a-zA-Z_]\w*\())(?:["']([^"'\\]{8,64})["']|([^"'\s#$()\[\]{};]{8,64})(?=[\s#;]|$))/gi,
     keywords: ["password", "passwd", "pwd"]
   }
 ];
