@@ -1,6 +1,7 @@
 import { DetectionRule } from "../types/index.js";
+import { EXTENDED_RULES } from "./extended.js";
 
-export const DETECTION_RULES: DetectionRule[] = [
+const BASE_RULES: DetectionRule[] = [
   {
     id: "aws-access-key",
     name: "AWS Access Key",
@@ -96,14 +97,6 @@ export const DETECTION_RULES: DetectionRule[] = [
     severity: "medium",
     pattern: /(https:\/\/[a-z0-9-]+\.firebaseio\.com)/g,
     keywords: ["firebaseio.com"]
-  },
-  {
-    id: "npm-access-token",
-    name: "NPM Access Token",
-    description: "Identifies NPM access tokens for package registry",
-    severity: "high",
-    pattern: /\b(npm_[A-Za-z0-9]{36})\b/g,
-    keywords: ["npm_"]
   },
   {
     id: "azure-storage-key",
@@ -210,7 +203,7 @@ export const DETECTION_RULES: DetectionRule[] = [
     severity: "medium",
     requiresEntropy: true,
     minEntropy: 3.0,
-    pattern: /(?:api[-_]?key|secret|api[-_]?token)\s*[:=]\s*["']?([A-Za-z0-9\-_]{20,64})["']?/gi,
+    pattern: /(?:['"]?(?:api[-_]?key|secret|api[-_]?token)['"]?\s*(?::\s*[A-Za-z_[\]]+\s*)?(?:=>|:=|[:=])\s*["']?)([A-Za-z0-9\-_]{20,64})(?:["']?)/gi,
     keywords: ["api", "secret", "token"]
   },
   {
@@ -234,7 +227,18 @@ export const DETECTION_RULES: DetectionRule[] = [
     //   fn()           → değer "(" ile sonlanmadan önce gelir
     //   ${template}    → değer "$" ile başlar
     // Yakaladığımız: quoted literal VEYA tırnaksız basit token (.env formatı)
-    pattern: /(?:password|passwd|pwd)\s*[:=]\s*(?!(?:process\.|getenv\b|\$\{|[a-zA-Z_]\w*\())(?:["']([^"'\\]{8,64})["']|([^"'\s#$()\[\]{};]{8,64})(?=[\s#;]|$))/gi,
+    pattern: /(?:['"]?(?:password|passwd|pwd)['"]?\s*(?::\s*[A-Za-z_[\]]+\s*)?(?:=>|:=|[:=])\s*)(?!(?:process\.|getenv\b|\$\{|[a-zA-Z_]\w*\())(?:["']([^"'\\]{8,64})["']|([^"'\s#$()\[\]{};]{8,64})(?=[\s#;]|$))/gi,
     keywords: ["password", "passwd", "pwd"]
   }
 ];
+
+const ruleMap = new Map<string, DetectionRule>();
+for (const rule of BASE_RULES) {
+  ruleMap.set(rule.id, rule);
+}
+for (const rule of EXTENDED_RULES) {
+  // External rules have priority
+  ruleMap.set(rule.id, rule);
+}
+
+export const DETECTION_RULES = Array.from(ruleMap.values());

@@ -5,7 +5,8 @@ export async function verifySlackWebhook(url: string): Promise<boolean | null> {
         const res = await fetch(url, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({})
+            body: JSON.stringify({}),
+            signal: AbortSignal.timeout(5000)
         });
 
         const text = await res.text();

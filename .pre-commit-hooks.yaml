@@ -1,0 +1,7 @@
+- id: gitleak-radar
+  name: Gitleak-Radar Security Secrets Scan
+  description: "Prevents trailing credentials, auth tokens, and secrets into commits via Gitleak-Radar."
+  entry: npx gitleak-radar --staged
+  language: system
+  pass_filenames: false
+  stages: [commit]

@@ -62,10 +62,10 @@ export interface SarifLog {
 export function generateSarifReport(result: ScanResult, toolVersion = "1.0.0"): SarifLog {
   const sarifRules: SarifRule[] = DETECTION_RULES.map((rule) => ({
     id: rule.id,
-    name: rule.name,
+    name: rule.name || rule.id,
     shortDescription: { text: rule.description },
     defaultConfiguration: { level: mapSeverityToSarifLevel(rule.severity) },
-    help: { text: `Hardcoded secret of type '${rule.name}' was detected. Revoke and rotate this secret immediately.` },
+    help: { text: `Hardcoded secret of type '${rule.name || rule.id}' was detected. Revoke and rotate this secret immediately.` },
     properties: { tags: ["security", "secret", "credentials", rule.severity] }
   }));
 
@@ -74,13 +74,13 @@ export function generateSarifReport(result: ScanResult, toolVersion = "1.0.0"): 
       ruleId: f.ruleId,
       level: mapSeverityToSarifLevel(f.severity),
       message: {
-        text: `Secret detected by rule '${f.ruleName}' (masked: ${f.maskedValue})`
+        text: `Secret detected by rule '${f.ruleName || f.ruleId}' (masked: ${f.maskedValue})`
       },
-              partialFingerprints: f.secretHash ? {
-          secretHash: f.secretHash,
-          primaryLocationLineHash: f.secretHash
-        } : undefined,
-        locations: [
+      partialFingerprints: f.secretHash ? {
+        secretHash: f.secretHash,
+        primaryLocationLineHash: f.secretHash
+      } : undefined,
+      locations: [
         {
           physicalLocation: {
             artifactLocation: {

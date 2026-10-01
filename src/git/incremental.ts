@@ -16,7 +16,10 @@ export async function getChangedFilesSince(targetDir: string, ref: string): Prom
 
   let diffStdout = "";
   try {
-    const res = await execFileAsync("git", ["diff", "--name-only", "--diff-filter=d", "--end-of-options", ref, "--"], {
+    const res = await execFileAsync("git", [
+      "-c", "core.quotepath=off",
+      "diff", "--name-only", "-z", "--diff-filter=d", "--end-of-options", ref, "--"
+    ], {
       cwd: gitRoot
     });
     diffStdout = res.stdout;
@@ -27,7 +30,10 @@ export async function getChangedFilesSince(targetDir: string, ref: string): Prom
   // Çalışma dizinindeki yeni (untracked) dosyaları da listeye ekle
   let untrackedStdout = "";
   try {
-    const res = await execFileAsync("git", ["ls-files", "--others", "--exclude-standard"], {
+    const res = await execFileAsync("git", [
+      "-c", "core.quotepath=off",
+      "ls-files", "-z", "--others", "--exclude-standard"
+    ], {
       cwd: gitRoot
     });
     untrackedStdout = res.stdout;
@@ -36,11 +42,10 @@ export async function getChangedFilesSince(targetDir: string, ref: string): Prom
   }
 
   const allLines = [
-    ...diffStdout.split(/\r?\n/),
-    ...untrackedStdout.split(/\r?\n/)
+    ...diffStdout.split("\0"),
+    ...untrackedStdout.split("\0")
   ]
     .map((s) => s.trim())
-    .map((s) => (s.startsWith('"') && s.endsWith('"') ? s.slice(1, -1) : s))
     .filter(Boolean);
 
   const uniqueFiles = Array.from(new Set(allLines));

@@ -111,8 +111,8 @@ Baseline entries use SHA-256 fingerprints based on finding coordinates and rule 
 
 Use the composite action from a tagged release. Pinning the tag or commit is
 recommended for reproducible CI. The action release and the npm scanner
-release is synchronized at `v1.5.4`; the action runs the reviewed
-`gitleak-radar@1.5.4` package by default.
+release is synchronized at `v1.5.5`; the action runs the reviewed
+`gitleak-radar@1.5.5` package by default.
 
 ```yaml
 permissions:
@@ -124,9 +124,9 @@ steps:
     with:
       fetch-depth: 0
   - name: Scan for secrets
-    uses: gecekusu1979/gitleak-radar@v1.5.4
+    uses: gecekusu1979/gitleak-radar@v1.5.5
     with:
-      version: '1.5.4'
+      version: '1.5.5'
       upload-sarif: true
       upload-artifact: true
       fail-on-findings: true
@@ -157,7 +157,7 @@ during installation.
 | Input | Default | Purpose |
 | --- | --- | --- |
 | `path` | `.` | Directory to scan |
-| `version` | `1.5.4` | Exact npm scanner version |
+| `version` | `1.5.5` | Exact npm scanner version |
 | `severity` | `low` | Minimum finding severity |
 | `since` | empty | Scan changes since a Git ref |
 | `staged` | `false` | Scan staged Git index files |
@@ -186,7 +186,7 @@ Suppress a finding on the same line or on the following line. A rule ID may be s
 
 ```typescript
 // gitleak-radar:ignore-next-line
-const mockToken = "sk_live_" + "abcdef1234567890abcdef1234";
+const mockToken = "sk_live_" + "invalid_mock_token_for_docs_1234";
 
 const sampleKey = "AKIA1234567890EXAMPLE"; // gitleak-radar:ignore aws-access-key
 ```
@@ -580,7 +580,7 @@ Note: `src/cli/index.ts` and `src/reporters/terminal.ts` report 0% in this table
 
 ## Roadmap
 
-### Completed in v1.5.4 (Evasion Defense & FP Reduction)
+### Completed in v1.5.5 (Evasion Defense & FP Reduction)
 
 - [x] Robust UTF-16LE/BE active heuristic decoding for PowerShell and text-editor encoded `.env` files
 - [x] Eliminated Generic Password false-positives via context-aware negative lookahead filtering (`process.env`, `fn()`)

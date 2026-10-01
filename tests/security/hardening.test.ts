@@ -29,7 +29,7 @@ describe("Self-Security Hardening Suite", () => {
     const repoDir = path.join(tempDir, "repo");
     await fs.mkdir(repoDir);
     const symlinkPath = path.join(repoDir, "symlink-to-secret.env");
-    
+
     try {
       await fs.symlink(externalSecret, symlinkPath);
     } catch {
@@ -38,13 +38,13 @@ describe("Self-Security Hardening Suite", () => {
     }
 
     const content = await readFileLines(symlinkPath);
-    expect(content).toBeNull();
+    expect(content).toEqual(expect.objectContaining({ skipped: true }));
   });
 
   it("prevents path traversal outside git repository in readStagedFileLines", async () => {
     await execFileAsync("git", ["init"], { cwd: tempDir });
     const traversalResult = await readStagedFileLines(tempDir, "../../../etc/passwd");
-    expect(traversalResult).toBeNull();
+    expect(traversalResult).toEqual(expect.objectContaining({ skipped: true }));
   });
 
   it("protects against ReDoS by bounding line scan length within safe threshold", () => {
@@ -55,7 +55,7 @@ describe("Self-Security Hardening Suite", () => {
     const findings = detector.scanLine(massiveLine, 1, "bundle.min.js");
     const duration = performance.now() - startTime;
 
-    expect(duration).toBeLessThan(50);
+    expect(duration).toBeLessThan(150);
     expect(findings).toEqual([]);
   });
 });

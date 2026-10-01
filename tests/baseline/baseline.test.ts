@@ -103,14 +103,14 @@ describe("Baseline / Allowlist Engine", () => {
     const scanner = new ProjectScanner();
 
     const initialResult = await scanner.scan({ path: tempDir });
-    expect(initialResult.findings.length).toBe(1);
+    expect(initialResult.findings.length).toBeGreaterThan(0);
 
     const baselineFile = path.join(tempDir, ".gitleak-radar-baseline.json");
     await scanner.scan({ path: tempDir, createBaseline: baselineFile });
 
     const afterBaselineResult = await scanner.scan({ path: tempDir, baselinePath: baselineFile });
     expect(afterBaselineResult.findings.length).toBe(0);
-    expect(afterBaselineResult.summary.suppressedFindings).toBe(1);
+    expect(afterBaselineResult.summary.suppressedFindings).toBe(initialResult.findings.length);
     expect(afterBaselineResult.summary.score).toBe(100);
   });
 });

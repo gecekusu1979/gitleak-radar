@@ -4,7 +4,8 @@ export async function verifyGithubPat(token: string): Promise<boolean | null> {
             headers: {
                 Authorization: `Bearer ${token}`,
                 "User-Agent": "gitleak-radar-verifier"
-            }
+            },
+            signal: AbortSignal.timeout(5000)
         });
 
         if (res.status === 200) return true;

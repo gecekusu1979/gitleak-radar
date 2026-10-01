@@ -4,22 +4,22 @@ import { shouldIgnoreFile, isPlaceholderOrExample, EXCLUDED_DIRECTORIES } from "
 describe("Scanner File Filters", () => {
   it("ignores binary formats", () => {
     expect(shouldIgnoreFile("image.png")).toBe(true);
-    expect(shouldIgnoreFile("archive.zip")).toBe(true);
+    expect(shouldIgnoreFile("archive.zip")).toBe(false); // ZIP files are now scanned
     expect(shouldIgnoreFile("executable.exe")).toBe(true);
     expect(shouldIgnoreFile("font.woff2")).toBe(true);
   });
 
-  it("ignores lockfiles and minified bundles", () => {
+  it("ignores lockfiles but scans minified bundles", () => {
     expect(shouldIgnoreFile("package-lock.json")).toBe(true);
     expect(shouldIgnoreFile("pnpm-lock.yaml")).toBe(true);
     expect(shouldIgnoreFile("yarn.lock")).toBe(true);
-    expect(shouldIgnoreFile("app.bundle.min.js")).toBe(true);
+    expect(shouldIgnoreFile("app.bundle.min.js")).toBe(false); // Minified files are now scanned
   });
 
   it("defines standard excluded system/build directories in globs and does not exclude test folders", () => {
     expect(EXCLUDED_DIRECTORIES).toContain("**/node_modules/**");
     expect(EXCLUDED_DIRECTORIES).toContain("**/.git/**");
-    expect(EXCLUDED_DIRECTORIES).toContain("**/dist/**");
+    expect(EXCLUDED_DIRECTORIES).not.toContain("**/dist/**");
     expect(EXCLUDED_DIRECTORIES).not.toContain("**/tests/**");
     expect(EXCLUDED_DIRECTORIES).not.toContain("**/test/**");
   });

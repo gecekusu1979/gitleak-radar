@@ -3,6 +3,8 @@ import path from "node:path";
 import fs from "node:fs";
 import { type Finding, type ScanOptions, type ScanResult, type DetectionRule } from "../types/index.js";
 import { SecretDetector } from "../detectors/detector.js";
+import { SemanticParser } from "../detectors/semantic-parser.js";
+import { ArchiveProcessor } from "../detectors/archive-processor.js";
 import { EXCLUDED_DIRECTORIES, shouldIgnorePath } from "./file-filter.js";
 import { readFileLines, parseByteSize, DEFAULT_MAX_FILE_SIZE_BYTES, type FileContent } from "./file-reader.js";
 import { calculateSecurityScore } from "../scoring/scorer.js";
@@ -43,18 +45,21 @@ export class ProjectScanner {
     }
 
     const activeRules = await getEffectiveRules(config, extraRules);
-    const maxDecodeDepth = options.maxDecodeDepth ?? config.maxDecodeDepth ?? 2;
+    const maxDecodeDepth = options.maxDecodeDepth ?? config.maxDecodeDepth ?? 3;
     const detector = new SecretDetector(
       activeRules,
       [...(config.allowlist ?? []), ...(options.allowlist ?? [])],
       maxDecodeDepth
     );
+    const semanticParser = new SemanticParser(detector);
+    const archiveProcessor = new ArchiveProcessor(detector);
 
     const rawLimit = options.maxFileSize ?? config.maxFileSize;
     const maxFileSizeBytes = rawLimit !== undefined ? parseByteSize(rawLimit) : DEFAULT_MAX_FILE_SIZE_BYTES;
 
     let rawFindings: Finding[] = [];
     let filesScannedCount = 0;
+    let skippedFilesCount = 0;
     let linesScannedCount = 0;
     let commitsScannedCount: number | undefined;
 
@@ -135,7 +140,17 @@ export class ProjectScanner {
         }
 
         const absolutePath = path.resolve(targetConfigDir, normalizedPath);
-        let fileData: FileContent | null = null;
+
+        const archiveExt = normalizedPath.split('.').pop()?.toLowerCase();
+        if (archiveExt === "zip" || archiveExt === "jar") {
+          if (archiveProcessor.scanArchive(absolutePath, normalizedPath, rawFindings)) {
+            filesScannedCount++;
+            options.onFileAction?.(normalizedPath, "scanned");
+            continue;
+          }
+        }
+
+        let fileData: FileContent | { skipped: true; reason: string } | null = null;
 
         if (options.staged) {
           const gitRoot = await getGitRoot(targetConfigDir);
@@ -145,8 +160,10 @@ export class ProjectScanner {
           fileData = await readFileLines(absolutePath, maxFileSizeBytes);
         }
 
-        if (!fileData) {
-          options.onFileAction?.(normalizedPath, "binary");
+        if (!fileData || ('skipped' in fileData)) {
+          const reason = (fileData && 'reason' in fileData) ? fileData.reason : "binary";
+          skippedFilesCount++;
+          options.onFileAction?.(normalizedPath, "ignored"); // Or skipped
           continue;
         }
 
@@ -154,9 +171,41 @@ export class ProjectScanner {
         filesScannedCount++;
         linesScannedCount += fileData.totalLines;
 
+        const semanticExt = normalizedPath.split('.').pop()?.toLowerCase();
+        if (semanticExt === "json" || semanticExt === "yaml" || semanticExt === "yml" || semanticExt === "env") {
+          const fullContent = fileData.lines.join("\n");
+          if (fullContent.length < 65536) {
+            if (semanticParser.parseAndScan(fullContent, normalizedPath, rawFindings)) {
+              continue;
+            }
+          }
+        }
+
         for (let i = 0; i < fileData.lines.length; i++) {
-          const lineContent = fileData.lines[i]!;
+          let lineContent = fileData.lines[i]!;
           const previousLine = i > 0 ? fileData.lines[i - 1] : undefined;
+
+          // Phase 7: Sliding window for unclosed template/string splices
+          const tickCount = (lineContent.match(/`/g) || []).length;
+          const quoteCount = (lineContent.match(/"/g) || []).length;
+          const aposCount = (lineContent.match(/'/g) || []).length;
+
+          const endsWithConcat = /[\+\\]\s*$/.test(lineContent.trim());
+          if ((tickCount % 2 !== 0 || quoteCount % 2 !== 0 || aposCount % 2 !== 0 || endsWithConcat) && i < fileData.lines.length - 1) {
+            let merged = lineContent.trimEnd();
+            let mergeCount = 0;
+            for (let j = 1; j <= 2 && i + j < fileData.lines.length; j++) {
+              const nextLine = fileData.lines[i + j]!;
+              merged += nextLine.trim();
+              mergeCount++;
+              const t = (nextLine.match(/`/g) || []).length;
+              const q = (nextLine.match(/"/g) || []).length;
+              const a = (nextLine.match(/'/g) || []).length;
+              if (t > 0 || q > 0 || a > 0) break;
+            }
+            lineContent = merged;
+            i += mergeCount;
+          }
 
           // Çok uzun satırları örtüşen parçalara böl (65 536 char limit)
           const MAX_LINE_LENGTH = 65_536;
@@ -172,6 +221,7 @@ export class ProjectScanner {
                 options.severity ?? "low",
                 previousLine
               );
+              for (const f of chunkFindings) f.column += chunkStart;
               rawFindings.push(...chunkFindings);
               if (chunkStart + MAX_LINE_LENGTH >= lineContent.length) break;
               chunkStart += MAX_LINE_LENGTH - CHUNK_OVERLAP;
@@ -204,6 +254,7 @@ export class ProjectScanner {
       return {
         summary: {
           filesScanned: filesScannedCount,
+          skippedFiles: skippedFilesCount > 0 ? skippedFilesCount : undefined,
           linesScanned: linesScannedCount,
           findings: 0,
           suppressedFindings: rawFindings.length,
@@ -221,15 +272,28 @@ export class ProjectScanner {
 
     if (options.verify) {
       const { verifyFinding } = await import("../verifiers/index.js");
-      const verifyPromises = rawFindings.map(async (finding) => {
-        if (finding.rawSecret) {
-          const isVerified = await verifyFinding(finding, finding.rawSecret);
-          if (isVerified !== null) {
-            finding.verified = isVerified;
+      const verifiedSecretsCache = new Map<string, boolean | null>();
+
+      // Concurrency Limit Batch Execution
+      const BATCH_SIZE = 5;
+      for (let i = 0; i < rawFindings.length; i += BATCH_SIZE) {
+        const batch = rawFindings.slice(i, i + BATCH_SIZE);
+        await Promise.all(batch.map(async (finding) => {
+          if (finding.rawSecret) {
+            if (verifiedSecretsCache.has(finding.rawSecret)) {
+              const cachedResult = verifiedSecretsCache.get(finding.rawSecret);
+              if (cachedResult !== null) finding.verified = cachedResult;
+              return;
+            }
+
+            const isVerified = await verifyFinding(finding, finding.rawSecret);
+            verifiedSecretsCache.set(finding.rawSecret, isVerified);
+            if (isVerified !== null) {
+              finding.verified = isVerified;
+            }
           }
-        }
-      });
-      await Promise.all(verifyPromises);
+        }));
+      }
     }
 
     for (const f of rawFindings) delete f.rawSecret;
@@ -251,6 +315,7 @@ export class ProjectScanner {
     return {
       summary: {
         filesScanned: filesScannedCount,
+        skippedFiles: skippedFilesCount > 0 ? skippedFilesCount : undefined,
         linesScanned: linesScannedCount,
         findings: finalFindings.length,
         suppressedFindings: suppressedCount > 0 ? suppressedCount : undefined,

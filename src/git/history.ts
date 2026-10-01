@@ -31,6 +31,7 @@ export async function scanGitHistory(
       "log",
       "-p",
       "-U0",
+      "--all",
       "--no-color",
       "--full-history",
       "--no-ext-diff",
@@ -69,6 +70,7 @@ export async function scanGitHistory(
     let totalLinesScanned = 0;
     let isFileIgnored = false;
     let currentFileDiffBytes = 0;
+    let currentInHunk = false;
 
     rl.on("line", (line: string) => {
       if (line.startsWith(COMMIT_START_MARKER)) {
@@ -84,10 +86,16 @@ export async function scanGitHistory(
         currentFile = "";
         isFileIgnored = false;
         currentFileDiffBytes = 0;
+        currentInHunk = false;
         return;
       }
 
-      if (line.startsWith("+++ ")) {
+      if (line.startsWith("diff --git ")) {
+        currentInHunk = false;
+        return;
+      }
+
+      if (!currentInHunk && line.startsWith("+++ ")) {
         let rawPath = line.slice(4).trim();
         if (rawPath.startsWith('"') && rawPath.endsWith('"')) {
           rawPath = rawPath.slice(1, -1);
@@ -124,6 +132,7 @@ export async function scanGitHistory(
       }
 
       if (line.startsWith("@@ ")) {
+        currentInHunk = true;
         const match = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
         if (match && match[1]) {
           currentLineNumber = parseInt(match[1], 10);
@@ -131,7 +140,7 @@ export async function scanGitHistory(
         return;
       }
 
-      if (line.startsWith("+") && !line.startsWith("+++")) {
+      if (currentInHunk && line.startsWith("+")) {
         const addedContent = line.slice(1);
         currentFileDiffBytes += Buffer.byteLength(addedContent, "utf8");
 
@@ -141,20 +150,46 @@ export async function scanGitHistory(
 
         totalLinesScanned++;
 
-        const lineFindings = detector.scanLine(
-          addedContent,
-          currentLineNumber,
-          currentFile,
-          minSeverity
-        );
+        const MAX_LINE_LENGTH = 65_536;
+        const CHUNK_OVERLAP = 256;
 
-        for (const f of lineFindings) {
-          findings.push({
-            ...f,
-            commit: currentCommit,
-            commitAuthor: currentAuthor,
-            commitDate: currentDate
-          });
+        if (addedContent.length > MAX_LINE_LENGTH) {
+          let chunkStart = 0;
+          while (chunkStart < addedContent.length) {
+            const chunk = addedContent.slice(chunkStart, chunkStart + MAX_LINE_LENGTH);
+            const lineFindings = detector.scanLine(
+              chunk,
+              currentLineNumber,
+              currentFile,
+              minSeverity
+            );
+            for (const f of lineFindings) {
+              findings.push({
+                ...f,
+                commit: currentCommit,
+                commitAuthor: currentAuthor,
+                commitDate: currentDate
+              });
+            }
+            if (chunkStart + MAX_LINE_LENGTH >= addedContent.length) break;
+            chunkStart += MAX_LINE_LENGTH - CHUNK_OVERLAP;
+          }
+        } else {
+          const lineFindings = detector.scanLine(
+            addedContent,
+            currentLineNumber,
+            currentFile,
+            minSeverity
+          );
+
+          for (const f of lineFindings) {
+            findings.push({
+              ...f,
+              commit: currentCommit,
+              commitAuthor: currentAuthor,
+              commitDate: currentDate
+            });
+          }
         }
 
         currentLineNumber++;

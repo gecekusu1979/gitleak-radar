@@ -74,7 +74,8 @@ export async function explainRule(ruleId: string, targetPath: string = "."): Pro
     console.log(chalk.gray("\nAvailable rule IDs:"));
     const available = allRules.map((r) => r.id).join(", ");
     console.log(`  ${available}\n`);
-    process.exit(2);
+    process.exitCode = 2;
+    return;
   }
 
   console.log(chalk.bold("\n========================================"));

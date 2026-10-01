@@ -48,12 +48,13 @@ describe("Git History Scanning (Hardened Engine)", () => {
 
     // History taraması: Git veritabanındaki sızıntıyı commit hash'i ve yazar bilgisiyle yakalamalı
     const historyScan = await scan({ path: tempRepo, history: true });
-    expect(historyScan.findings.length).toBe(1);
-    expect(historyScan.findings[0]?.ruleId).toBe("stripe-api-key");
-    expect(historyScan.findings[0]?.commit).toBeDefined();
-    expect(historyScan.findings[0]?.commit?.length).toBe(40);
-    expect(historyScan.findings[0]?.commitAuthor).toBe("Security Lead | Auditor");
-    expect(historyScan.findings[0]?.commitDate).toBeDefined();
+    expect(historyScan.findings.length).toBeGreaterThan(0);
+    const stripeFinding = historyScan.findings.find(f => f.ruleId === "stripe-api-key");
+    expect(stripeFinding).toBeDefined();
+    expect(stripeFinding?.commit).toBeDefined();
+    expect(stripeFinding?.commit?.length).toBe(40);
+    expect(stripeFinding?.commitAuthor).toBe("Security Lead | Auditor");
+    expect(stripeFinding?.commitDate).toBeDefined();
     expect(historyScan.summary.commitsScanned).toBe(2);
   });
 

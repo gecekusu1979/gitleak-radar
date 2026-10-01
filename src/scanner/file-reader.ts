@@ -57,7 +57,7 @@ export function parseByteSize(input: string | number): number {
 export async function readFileLines(
   filePath: string,
   maxSizeBytes: number = DEFAULT_MAX_FILE_SIZE_BYTES
-): Promise<FileContent | null> {
+): Promise<FileContent | { skipped: true; reason: string }> {
   try {
     let stats: any = null;
     if (typeof fs.lstat === "function") {
@@ -76,10 +76,10 @@ export async function readFileLines(
     }
 
     if (typeof stats?.isSymbolicLink === "function" && stats.isSymbolicLink()) {
-      return null;
+      return { skipped: true, reason: "symlink" };
     }
     if (stats && stats.size > maxSizeBytes) {
-      return null;
+      return { skipped: true, reason: "too-large" };
     }
 
     const rawBuffer = await fs.readFile(filePath);
@@ -105,7 +105,7 @@ export async function readFileLines(
       for (let i = 0; i < sampleSize; i++) {
         if (rawBuffer[i] === 0) nullCount++;
       }
-      // Byte'ların >%30'u null ise UTF-16LE olarak deneyerek oku
+      // Byte'ların >%30'u null ise UTF-16LE veya BE olarak deneyerek oku
       if (nullCount / sampleSize > 0.3 && rawBuffer.length >= 4) {
         // İlk byte çift konumdaki karakterlerin printable olup olmadığını kontrol et
         const sample = rawBuffer.slice(0, Math.min(rawBuffer.length, 256));
@@ -116,19 +116,30 @@ export async function readFileLines(
           sample[1] === 0 &&
           sample[2]! >= 0x20 && sample[2]! < 0x7f &&
           sample[3] === 0;
+
+        const beLikely =
+          sample.length >= 4 &&
+          sample[0] === 0 &&
+          sample[1]! >= 0x20 && sample[1]! < 0x7f &&
+          sample[2] === 0 &&
+          sample[3]! >= 0x20 && sample[3]! < 0x7f;
+
         if (leLikely) {
           content = rawBuffer.toString("utf16le");
+        } else if (beLikely) {
+          const swapped = Buffer.allocUnsafe(rawBuffer.length - (rawBuffer.length % 2));
+          for (let i = 0; i < swapped.length; i += 2) {
+            swapped[i] = rawBuffer[i + 1]!;
+            swapped[i + 1] = rawBuffer[i]!;
+          }
+          content = swapped.toString("utf16le");
         } else {
-          // Genel binary dosya — atla
-          return null;
+          // Null interleaving evasion savunması
+          content = rawBuffer.toString("utf-8").replace(/\0/g, "");
         }
       } else {
-        // Normal binary kontrol: tek null bile varsa atla
-        const checkSize = Math.min(rawBuffer.length, 1024);
-        for (let i = 0; i < checkSize; i++) {
-          if (rawBuffer[i] === 0) return null;
-        }
-        content = rawBuffer.toString("utf-8");
+        // Tolerant parsing: null byte'ları temizle
+        content = rawBuffer.toString("utf-8").replace(/\0/g, "");
       }
     }
 
@@ -139,7 +150,7 @@ export async function readFileLines(
       lines,
       totalLines: lines.length
     };
-  } catch {
-    return null;
+  } catch (err: any) {
+    return { skipped: true, reason: err.message || "read-error" };
   }
 }

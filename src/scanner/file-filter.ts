@@ -2,21 +2,15 @@ import path from "node:path";
 
 export const EXCLUDED_DIRECTORIES = [
   "**/node_modules/**",
-  "**/.git/**",
-  "**/dist/**",
-  "**/build/**",
-  "**/.next/**",
-  "**/coverage/**",
-  "**/vendor/**"
+  "**/.git/**"
 ];
 
 export const EXCLUDED_EXTENSIONS = new Set([
   ".exe", ".dll", ".so", ".dylib", ".bin",
-  ".zip", ".tar", ".gz", ".7z", ".rar",
-  ".png", ".jpg", ".jpeg", ".gif", ".ico", ".svg", ".webp",
+  ".tar", ".gz", ".7z", ".rar",
+  ".png", ".jpg", ".jpeg", ".gif", ".ico", ".webp",
   ".mp4", ".mp3", ".wav", ".avi", ".mov",
-  ".pdf", ".woff", ".woff2", ".ttf", ".eot",
-  ".lock"
+  ".woff", ".woff2", ".ttf", ".eot"
 ]);
 
 export const EXCLUDED_FILENAMES = new Set([
@@ -61,7 +55,6 @@ export function shouldIgnoreFile(filePath: string, scanAllExtensions: boolean = 
 
   if (!scanAllExtensions && EXCLUDED_EXTENSIONS.has(ext)) return true;
   if (EXCLUDED_FILENAMES.has(basename)) return true;
-  if (!scanAllExtensions && (basename.endsWith(".min.js") || basename.endsWith(".min.css"))) return true;
 
   return false;
 }
@@ -117,7 +110,7 @@ export function isPlaceholderOrExample(
     return true;
   }
 
-  if (normalizedLine.includes("e.g.") || normalizedLine.includes("example:")) {
+  if (normalizedValue.includes("e.g.") || normalizedValue.includes("example:")) {
     return true;
   }
 

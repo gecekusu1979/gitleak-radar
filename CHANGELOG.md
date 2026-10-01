@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.5.4] - Unreleased
+## [1.5.5] - Unreleased
 ### Added
 - Deduplicated scoring based on coordinate tracking and `secretHash` isolation.
 - Global keyword pre-filtering optimization for enhanced performance.

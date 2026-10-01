@@ -3,7 +3,8 @@ export async function verifyStripeKey(token: string): Promise<boolean | null> {
         const res = await fetch("https://api.stripe.com/v1/charges", {
             headers: {
                 Authorization: `Bearer ${token}`
-            }
+            },
+            signal: AbortSignal.timeout(5000)
         });
 
         if (res.status === 200) return true; // valid

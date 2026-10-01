@@ -9,6 +9,7 @@ describe("Custom Rules Engine", () => {
     const def: CustomRuleDefinition = {
       id: "corp-token",
       name: "Corporate Internal Token",
+      description: "Test description",
       severity: "critical",
       regex: "corp-[a-z0-9]{8}"
     };
@@ -27,6 +28,7 @@ describe("Custom Rules Engine", () => {
     const def: CustomRuleDefinition = {
       id: "broken-regex",
       name: "Broken",
+      description: "Test description",
       severity: "high",
       regex: "/[a-z(/"
     };
@@ -38,6 +40,7 @@ describe("Custom Rules Engine", () => {
     const def: CustomRuleDefinition = {
       id: "evil-rule",
       name: "Evil",
+      description: "Test description",
       severity: "high",
       regex: "(a+)+"
     };
@@ -49,6 +52,7 @@ describe("Custom Rules Engine", () => {
     const def: CustomRuleDefinition = {
       id: "benign-repeated",
       name: "Benign",
+      description: "Test description",
       severity: "low",
       regex: "(abc)+"
     };
@@ -61,6 +65,7 @@ describe("Custom Rules Engine", () => {
     const def: CustomRuleDefinition = {
       id: "high-entropy-custom",
       name: "High Entropy Custom",
+      description: "Test description",
       severity: "high",
       regex: "secret_[a-zA-Z0-9]{16}",
       minEntropy: 3.5,
@@ -79,10 +84,11 @@ describe("Custom Rules Engine", () => {
     expect(highEntropy.length).toBe(1);
   });
 
-  it("allows custom rules to override built-in rules with the same ID", async () => {
+  it("prevents custom rules from overriding built-in rules with the same ID", async () => {
     const customAws: CustomRuleDefinition = {
       id: "aws-access-key",
       name: "Custom Corporate AWS Key",
+      description: "Test description",
       severity: "critical",
       regex: "AKIA[0-9A-Z]{16}"
     };
@@ -91,11 +97,11 @@ describe("Custom Rules Engine", () => {
       ignore: [],
       rules: {},
       customRules: [customAws]
-    });
+    } as any);
 
     const overriddenRule = effective.find((r) => r.id === "aws-access-key");
     expect(overriddenRule).toBeDefined();
-    expect(overriddenRule?.name).toBe("Custom Corporate AWS Key");
+    expect(overriddenRule?.name).not.toBe("Custom Corporate AWS Key");
   });
 
   it("loads and parses external custom rules file correctly", async () => {

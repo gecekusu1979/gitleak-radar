@@ -11,7 +11,7 @@ export const SeverityOrder: Record<Severity, number> = {
 
 export const DetectionRuleSchema = z.object({
   id: z.string(),
-  name: z.string(),
+  name: z.string().optional(),
   description: z.string(),
   severity: z.enum(["low", "medium", "high", "critical"]),
   pattern: z.instanceof(RegExp),
@@ -37,7 +37,7 @@ export type CustomRuleDefinition = z.infer<typeof CustomRuleSchema>;
 
 export interface Finding {
   ruleId: string;
-  ruleName: string;
+  ruleName?: string;
   severity: Severity;
   file: string;
   line: number;
@@ -84,6 +84,7 @@ export interface ScanResult {
   summary: {
     filesScanned: number;
     linesScanned: number;
+    skippedFiles?: number;
     findings: number;
     suppressedFindings?: number;
     score: number;

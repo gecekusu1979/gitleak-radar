@@ -103,7 +103,7 @@ export const ConfigSchema = z.object({
   rules: z.record(z.enum(VALID_RULE_IDS), z.boolean()).default({}),
   customRules: z.array(CustomRuleSchema).default([]),
   maxFileSize: z.union([z.string(), z.number()]).optional(),
-  maxDecodeDepth: z.number().int().min(0).max(10).optional()
+  maxDecodeDepth: z.number().int().min(0).max(10).default(3)
 });
 
 export type RadarConfig = z.infer<typeof ConfigSchema>;
@@ -112,7 +112,8 @@ const DEFAULT_CONFIG: RadarConfig = {
   ignore: [],
   allowlist: [],
   rules: {},
-  customRules: []
+  customRules: [],
+  maxDecodeDepth: 3
 };
 
 export async function loadExternalRulesFile(filePath: string): Promise<DetectionRule[]> {
@@ -166,41 +167,54 @@ export async function loadConfig(targetDir: string): Promise<RadarConfig> {
 
   while (true) {
     const configPath = path.join(currentDir, ".gitleak-radar.json");
-    let raw: string;
+    let raw: string | null = null;
     try {
       raw = (await fs.readFile(configPath, "utf-8")).replace(/^\uFEFF/, "");
     } catch (err: any) {
-      if (err?.code === "ENOENT") {
-        const parent = path.dirname(currentDir);
-        if (parent === currentDir) {
-          return DEFAULT_CONFIG;
-        }
-        currentDir = parent;
-        continue;
+      if (err?.code !== "ENOENT") {
+        throw err;
       }
-      throw err;
     }
 
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(raw);
-    } catch (err: any) {
-      throw new Error(`Invalid .gitleak-radar.json: Malformed JSON (${err.message})`);
+    if (raw !== null) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (err: any) {
+        throw new Error(`Invalid .gitleak-radar.json: Malformed JSON (${err.message})`);
+      }
+
+      const result = ConfigSchema.safeParse(parsed);
+      if (!result.success) {
+        const issues = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+        throw new Error(
+          `Invalid .gitleak-radar.json: ${issues}\nValid built-in rule IDs: ${VALID_RULE_IDS.join(", ")}`
+        );
+      }
+
+      for (const pattern of result.data.ignore) {
+        validateGlobPattern(pattern);
+      }
+
+      if (result.data.customRules && result.data.customRules.length > 0) {
+        console.warn(`[WARNING] customRules in .gitleak-radar.json are ignored for security (ReDoS prevention). Provide custom rules via the CLI --rules flag if necessary.`);
+        result.data.customRules = [];
+      }
+
+      return result.data;
     }
 
-    const result = ConfigSchema.safeParse(parsed);
-    if (!result.success) {
-      const issues = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
-      throw new Error(
-        `Invalid .gitleak-radar.json: ${issues}\nValid built-in rule IDs: ${VALID_RULE_IDS.join(", ")}`
-      );
+    // Config bulunamadı, yukarı çıkmadan önce git root'da mıyız kontrol et
+    const isGitRoot = await fs.stat(path.join(currentDir, ".git")).then(s => s.isDirectory()).catch(() => false);
+    if (isGitRoot) {
+      return DEFAULT_CONFIG;
     }
 
-    for (const pattern of result.data.ignore) {
-      validateGlobPattern(pattern);
+    const parent = path.dirname(currentDir);
+    if (parent === currentDir) {
+      return DEFAULT_CONFIG;
     }
-
-    return result.data;
+    currentDir = parent;
   }
 }
 
@@ -212,14 +226,23 @@ export async function getEffectiveRules(config: RadarConfig, extraRules: Detecti
     ruleMap.set(rule.id, rule);
   }
 
-  // 2. Config customRules kuralları yerleşik kuralların üzerine yazar (override)
+  // 2. Config customRules kuralları yerleşik kuralların üzerine yazar (override) (Genelde boş gelir çünkü loadConfig siliyor)
   const configCustomRules = await Promise.all((config.customRules || []).map(compileCustomRule));
   for (const rule of configCustomRules) {
+    if (DETECTION_RULES.some(r => r.id === rule.id)) {
+      console.warn(`[WARNING] customRule tried to override built-in rule "${rule.id}". Overriding built-in IDs is forbidden.`);
+      continue;
+    }
     ruleMap.set(rule.id, rule);
   }
 
   // 3. CLI/harici dosya kuralları en yüksek öncelikle üzerine yazar
   for (const rule of extraRules) {
+    // Harici dosyalara da izin vermeyelim ki güvenilir olsun
+    if (DETECTION_RULES.some(r => r.id === rule.id)) {
+      console.warn(`[WARNING] External rule file tried to override built-in rule "${rule.id}". Overriding built-in IDs is forbidden.`);
+      continue;
+    }
     ruleMap.set(rule.id, rule);
   }
 

@@ -7,6 +7,7 @@ vi.mock("node:fs/promises");
 describe("Config Loader", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(fs.stat).mockRejectedValue({ code: "ENOENT" });
   });
 
   it("returns default config when .gitleak-radar.json does not exist", async () => {

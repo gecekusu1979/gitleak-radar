@@ -32,11 +32,14 @@ export async function getStagedFiles(targetDir: string): Promise<string[]> {
 
   const gitRoot = await getGitRoot(targetDir);
 
-  const { stdout } = await execFileAsync("git", ["diff", "--cached", "--name-only", "--diff-filter=d", "--"], {
+  const { stdout } = await execFileAsync("git", [
+    "-c", "core.quotepath=off",
+    "diff", "--cached", "--name-only", "-z", "--diff-filter=d", "--"
+  ], {
     cwd: gitRoot
   });
 
-  const lines = stdout.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+  const lines = stdout.split("\0").map((s) => s.trim()).filter(Boolean);
   const existingFiles: string[] = [];
 
   for (const relativeToGitRoot of lines) {
@@ -59,21 +62,21 @@ export async function readStagedFileLines(
   gitRoot: string,
   relativeToGitRoot: string,
   maxSizeBytes: number = DEFAULT_MAX_FILE_SIZE_BYTES
-): Promise<FileContent | null> {
+): Promise<FileContent | { skipped: true; reason: string }> {
   const normalizedRelPath = relativeToGitRoot.replace(/\\/g, "/");
   const absolutePath = path.resolve(gitRoot, normalizedRelPath);
 
   // Path Traversal Koruması
   const relativeCheck = path.relative(gitRoot, absolutePath);
   if (relativeCheck.startsWith("..") || path.isAbsolute(relativeCheck)) {
-    return null;
+    return { skipped: true, reason: "path-traversal" };
   }
 
   // Symlink Koruması: Git Index nesne modu 120000 ise okuma
   try {
     const { stdout: lsOut } = await execFileAsync("git", ["ls-files", "-s", "--", normalizedRelPath], { cwd: gitRoot });
     if (lsOut.startsWith("120000")) {
-      return null;
+      return { skipped: true, reason: "symlink" };
     }
   } catch {
     // ls-files çıktısı alınamazsa devam et
@@ -85,7 +88,7 @@ export async function readStagedFileLines(
     });
     const size = parseInt(sizeOut.trim(), 10);
     if (!Number.isNaN(size) && size > maxSizeBytes) {
-      return null;
+      return { skipped: true, reason: "too-large" };
     }
 
     const { stdout } = await execFileAsync("git", ["show", `:${normalizedRelPath}`], {
@@ -96,20 +99,25 @@ export async function readStagedFileLines(
 
     const buffer = Buffer.isBuffer(stdout) ? stdout : Buffer.from(stdout);
     const checkLength = Math.min(buffer.length, 1024);
+    let nullCount = 0;
     for (let i = 0; i < checkLength; i++) {
       if (buffer[i] === 0) {
-        return null;
+        nullCount++;
       }
     }
 
-    const content = buffer.toString("utf8");
+    if (nullCount / checkLength > 0.01) {
+      return { skipped: true, reason: "binary (null-check)" };
+    }
+
+    const content = buffer.toString("utf8").replace(/\0/g, "");
     const lines = content.split(/\r?\n/);
     return {
       path: absolutePath,
       lines,
       totalLines: lines.length
     };
-  } catch {
-    return null;
+  } catch (err: any) {
+    return { skipped: true, reason: err.message || "read-error" };
   }
 }

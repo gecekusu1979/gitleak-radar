@@ -15,7 +15,7 @@ describe("readFileLines - File Size Protection", () => {
     } as any);
 
     const result = await readFileLines("large-file.dat");
-    expect(result).toBeNull();
+    expect(result).toEqual(expect.objectContaining({ skipped: true }));
   });
 
   it("reads lines normally when file size is within limits", async () => {
@@ -26,8 +26,8 @@ describe("readFileLines - File Size Protection", () => {
     vi.mocked(fs.readFile).mockResolvedValueOnce(Buffer.from("line1\nline2"));
 
     const result = await readFileLines("normal.ts");
-    expect(result).not.toBeNull();
-    expect(result?.lines).toEqual(["line1", "line2"]);
-    expect(result?.totalLines).toBe(2);
+    expect(result).not.toEqual(expect.objectContaining({ skipped: true }));
+    expect((result as any)?.lines).toEqual(["line1", "line2"]);
+    expect((result as any)?.totalLines).toBe(2);
   });
 });

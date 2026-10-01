@@ -7,10 +7,10 @@ describe("recursivelyDecodeLine - depth parameter", () => {
         expect(recursivelyDecodeLine(`token=${encoded}`, 0)).toEqual([]);
     });
 
-    it("defaults to DEFAULT_MAX_DECODE_DEPTH (2) when no depth is given", () => {
+    it("defaults to DEFAULT_MAX_DECODE_DEPTH (3) when no depth is given", () => {
         const once = Buffer.from("AKIAIOSFODNN7QAZWSXE").toString("base64");
         const twice = Buffer.from(once).toString("base64");
-        expect(DEFAULT_MAX_DECODE_DEPTH).toBe(2);
+        expect(DEFAULT_MAX_DECODE_DEPTH).toBe(3);
         const candidates = recursivelyDecodeLine(twice);
         expect(candidates.some((c) => c.text === "AKIAIOSFODNN7QAZWSXE")).toBe(true);
     });

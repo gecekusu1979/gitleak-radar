@@ -3,9 +3,9 @@ import { explainRule } from "../../src/commands/explain.js";
 
 describe("Rule Explainer (gitleak-radar explain)", () => {
   it("prints explanation and remediation steps for a built-in rule without throwing", async () => {
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => { });
     await explainRule("aws-access-key");
-    
+
     expect(logSpy).toHaveBeenCalled();
     const calls = logSpy.mock.calls.map((c) => c.join(" ")).join("\n");
     expect(calls).toContain("AWS Access Key");
@@ -14,15 +14,15 @@ describe("Rule Explainer (gitleak-radar explain)", () => {
   });
 
   it("exits with status code 2 for nonexistent rule", async () => {
-    const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
-      throw new Error("process.exit called");
-    }) as any);
-    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => { });
 
-    await expect(explainRule("nonexistent-rule-id-12345")).rejects.toThrow("process.exit called");
-    expect(exitSpy).toHaveBeenCalledWith(2);
+    // Store original exit code to restore later to prevent test suite exit code contamination
+    const originalExitCode = process.exitCode;
 
-    exitSpy.mockRestore();
+    await explainRule("nonexistent-rule-id-12345");
+    expect(process.exitCode).toBe(2);
+
+    process.exitCode = originalExitCode;
     errSpy.mockRestore();
   });
 });

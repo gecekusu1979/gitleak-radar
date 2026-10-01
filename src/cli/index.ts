@@ -92,7 +92,8 @@ program
         console.error(
           chalk.red(`Error: Invalid severity "${options.severity}". Valid options are: ${validSeverities.join(", ")}`)
         );
-        process.exit(2);
+        process.exitCode = 2;
+        return;
       }
 
       let maxDecodeDepth: number | undefined;
@@ -101,14 +102,16 @@ program
           console.error(
             chalk.red(`Error: Invalid --max-decode-depth "${options.maxDecodeDepth}". Must be an integer between 0 and 10.`)
           );
-          process.exit(2);
+          process.exitCode = 2;
+          return;
         }
         maxDecodeDepth = Number.parseInt(options.maxDecodeDepth, 10);
         if (maxDecodeDepth < 0 || maxDecodeDepth > 10) {
           console.error(
             chalk.red(`Error: Invalid --max-decode-depth "${options.maxDecodeDepth}". Must be an integer between 0 and 10.`)
           );
-          process.exit(2);
+          process.exitCode = 2;
+          return;
         }
       }
 
@@ -120,7 +123,8 @@ program
 
       if (activeModes.length > 1) {
         console.error(chalk.red(`Error: Cannot combine ${activeModes.join(" and ")}. Choose one scan mode.`));
-        process.exit(2);
+        process.exitCode = 2;
+        return;
       }
 
       const isMachineOutput = Boolean(
@@ -161,7 +165,8 @@ program
         if (options.createBaseline) {
           const outPath = typeof options.createBaseline === "string" ? options.createBaseline : ".gitleak-radar-baseline.json";
           console.log(chalk.green(`✓ Baseline successfully created at ${outPath} (${result.summary.suppressedFindings ?? 0} findings recorded).`));
-          process.exit(0);
+          process.exitCode = 0;
+          return;
         }
 
         // GitHub Actions Annotation
@@ -189,13 +194,16 @@ program
         }
 
         if (result.findings.length > 0) {
-          process.exit(1);
+          process.exitCode = 1;
+        } else {
+          process.exitCode = 0;
         }
-        process.exit(0);
+        return;
       } catch (err: any) {
         if (spinner) spinner.stop();
         console.error(chalk.red(`Error: ${err.message || err}`));
-        process.exit(2);
+        process.exitCode = 2;
+        return;
       }
     }
   );
@@ -216,7 +224,8 @@ program
     const configPath = path.resolve(process.cwd(), targetDir, ".gitleak-radar.json");
     if (fs.existsSync(configPath)) {
       console.log(chalk.yellow(`⚠ Configuration already exists at ${configPath}`));
-      process.exit(0);
+      process.exitCode = 0;
+      return;
     }
 
     const template = {
@@ -265,17 +274,19 @@ program
       console.error(
         chalk.red(`Error: Invalid severity "${options.severity}". Valid options are: ${validSeverities.join(", ")}`)
       );
-      process.exit(2);
+      process.exitCode = 2;
+      return;
     }
 
     const res = await installPreCommitHook(targetDir, options.severity);
     if (res.success) {
       console.log(chalk.green(`✓ ${res.message}`));
-      process.exit(0);
+      process.exitCode = 0;
     } else {
       console.error(chalk.red(`✗ Error: ${res.message}`));
-      process.exit(2);
+      process.exitCode = 2;
     }
+    return;
   });
 
 if (process.argv.length <= 2) {
